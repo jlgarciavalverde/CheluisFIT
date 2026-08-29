@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ExerciseSource {
+  EXERCISE_LIBRARY
+}
+
+enum ExerciseSetType {
+  NORMAL
+  WARMUP
+  SUPERSET
+  DROPSET
+}
+
+enum WorkoutSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id                String             @id @default(cuid())
+  firstName         String
+  lastName1         String
+  lastName2         String?
+  birthDate         DateTime
+  currentWeightKg   Float
+  currentHeightCm   Int
+  email             String             @unique
+  passwordHash      String
+  role              Role               @default(USER)
+  measurements      BodyMeasurement[]
+  workoutSessions   WorkoutSession[]
+  workoutTemplates  WorkoutTemplate[]
+  favoriteExercises FavoriteExercise[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model BodyMeasurement {
+  id         String   @id @default(cuid())
+  userId     String
+  weightKg   Float
+  heightCm   Int
+  measuredAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([measuredAt])
+}
+
+model Exercise {
+  id                       String                    @id @default(cuid())
+  externalId               String
+  source                   ExerciseSource            @default(EXERCISE_LIBRARY)
+  name                     String
+  gifUrl                   String
+  targetMuscles            String[]
+  secondaryMuscles         String[]
+  bodyParts                String[]
+  equipment                String[]
+  instructions             String[]
+  workoutExercises         WorkoutExercise[]
+  workoutTemplateExercises WorkoutTemplateExercise[]
+  favoriteExercises        FavoriteExercise[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  @@unique([source, externalId])
+  @@index([name])
+}
+
+model WorkoutSession {
+  id          String               @id @default(cuid())
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  performedAt DateTime             @default(now())
+  status      WorkoutSessionStatus @default(COMPLETED)
+  startedAt   DateTime             @default(now())
+  completedAt DateTime?
+  notes       String?
+  exercises   WorkoutExercise[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([userId, performedAt])
+}
+
+model WorkoutExercise {
+  id               String         @id @default(cuid())
+  workoutSessionId String
+  exerciseId       String
+  order            Int
+  notes            String?
+  workoutSession   WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exercise         Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sets             ExerciseSet[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([workoutSessionId])
+  @@index([exerciseId])
+}
+
+model ExerciseSet {
+  id                String          @id @default(cuid())
+  workoutExerciseId String
+  setNumber         Int
+  weightKg          Float
+  reps              Int
+  type              ExerciseSetType @default(NORMAL)
+  restSeconds       Int             @default(90)
+  completedAt       DateTime?
+  workoutExercise   WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([workoutExerciseId])
+}
+
+model FavoriteExercise {
+  id         String   @id @default(cuid())
+  userId     String
+  exerciseId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, exerciseId])
+  @@index([userId])
+  @@index([exerciseId])
+}
+
+model WorkoutTemplate {
+  id        String                    @id @default(cuid())
+  userId    String
+  user      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  notes     String?
+  exercises WorkoutTemplateExercise[]
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  @@index([userId, name])
+}
+
+model WorkoutTemplateExercise {
+  id                String               @id @default(cuid())
+  workoutTemplateId String
+  exerciseId        String
+  order             Int
+  notes             String?
+  workoutTemplate   WorkoutTemplate      @relation(fields: [workoutTemplateId], references: [id], onDelete: Cascade)
+  exercise          Exercise             @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  sets              WorkoutTemplateSet[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([workoutTemplateId])
+  @@index([exerciseId])
+}
+
+model WorkoutTemplateSet {
+  id                        String                  @id @default(cuid())
+  workoutTemplateExerciseId String
+  setNumber                 Int
+  targetWeightKg            Float?
+  targetReps                Int?
+  type                      ExerciseSetType         @default(NORMAL)
+  restSeconds               Int                     @default(90)
+  workoutTemplateExercise   WorkoutTemplateExercise @relation(fields: [workoutTemplateExerciseId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  @@index([workoutTemplateExerciseId])
+}
