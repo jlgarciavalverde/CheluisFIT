@@ -80,6 +80,8 @@ export function RoutineBuilderScreen() {
       body: JSON.stringify({
         name,
         notes: notes || undefined,
+        goal,
+        weeklyFrequency,
         exercises: exercises.map((exercise, exerciseIndex) => ({
           exerciseId: exercise.exerciseId,
           order: exerciseIndex + 1,
@@ -99,9 +101,66 @@ export function RoutineBuilderScreen() {
 
   return (
     <Screen>
-      <Section title={template ? "Editar rutina" : "Crear rutina"}>
-        <TextField value={name} onChangeText={setName} />
-        <TextField value={notes} onChangeText={setNotes} placeholder="Notas" />
+      <View style={styles.hero}>
+        <Text style={styles.eyebrow}>
+          {template ? "Editar rutina" : seedSession ? "Desde entrenamiento previo" : "Crear rutina"}
+        </Text>
+        <Text style={styles.title}>{name || "Rutina nueva"}</Text>
+        <Text style={styles.subtitle}>
+          {seedSession
+            ? `Base recuperada del ${formatLongDate(seedSession.performedAt)}`
+            : "Crea un plan semanal con objetivos, ejercicios y series."}
+        </Text>
+      </View>
+
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>Resumen del plan</Text>
+        <View style={styles.summaryRow}>
+          <SummaryStat label="Objetivo" value={goal} />
+          <SummaryStat label="Frecuencia" value={`${weeklyFrequency}d/sem`} />
+        </View>
+        <View style={styles.summaryRow}>
+          <SummaryStat label="Ejercicios" value={String(totals.exercises)} />
+          <SummaryStat label="Series" value={String(totals.sets)} />
+        </View>
+      </View>
+
+      <Section title="Configuración">
+        <TextField value={name} onChangeText={setName} placeholder="Nombre de la rutina" />
+        <TextField value={notes} onChangeText={setNotes} placeholder="Notas del plan" />
+
+        <View style={styles.selectorGroup}>
+          <Text style={styles.label}>Objetivo</Text>
+          <View style={styles.optionRow}>
+            {GOALS.map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => setGoal(option)}
+                style={[styles.optionChip, goal === option && styles.optionChipActive]}
+              >
+                <Text style={[styles.optionText, goal === option && styles.optionTextActive]}>{option}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.selectorGroup}>
+          <Text style={styles.label}>Frecuencia semanal</Text>
+          <View style={styles.optionRow}>
+            {FREQUENCIES.map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => setWeeklyFrequency(option)}
+                style={[styles.roundChip, weeklyFrequency === option && styles.roundChipActive]}
+              >
+                <Text style={[styles.roundText, weeklyFrequency === option && styles.roundTextActive]}>
+                  {option}d
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <Text style={styles.meta}>
           {totals.exercises} ejercicios · {totals.sets} series objetivo · {totals.effectiveSets}{" "}
           efectivas · {totals.estimatedMinutes} min
@@ -123,7 +182,7 @@ export function RoutineBuilderScreen() {
 
       <Section title="Bloques">
         {exercises.length === 0 ? (
-          <Text style={styles.meta}>Anade ejercicios para construir tu rutina.</Text>
+          <Text style={styles.meta}>Añade ejercicios para construir tu rutina.</Text>
         ) : (
           exercises.map((exercise, index) => (
             <RoutineExerciseBlock
@@ -333,6 +392,13 @@ function templateToBuilderExercises(template: WorkoutTemplate | null): RoutineBu
         name: templateExercise.exercise.name,
         targetMuscles: templateExercise.exercise.targetMuscles ?? [],
         equipment: templateExercise.exercise.equipment ?? [],
+        gifUrl: templateExercise.exercise.gifUrl ?? "",
+        secondaryMuscles: templateExercise.exercise.secondaryMuscles ?? [],
+        bodyParts: templateExercise.exercise.bodyParts ?? [],
+        instructions: [],
+        tips: [],
+        externalId: "",
+        source: "",
       },
       sets: templateExercise.sets.map((set) => ({
         clientId: createClientId(),
@@ -343,6 +409,35 @@ function templateToBuilderExercises(template: WorkoutTemplate | null): RoutineBu
       })),
     })) ?? []
   );
+}
+
+function sessionToBuilderExercises(session?: WorkoutSession | null): RoutineBuilderExercise[] {
+  if (!session) return [];
+
+  return session.exercises.map((entry) => ({
+    clientId: createClientId(),
+    exerciseId: entry.exerciseId,
+    exercise: {
+      id: entry.exerciseId,
+      name: entry.exercise.name,
+      gifUrl: entry.exercise.gifUrl ?? "",
+      targetMuscles: entry.exercise.targetMuscles ?? [],
+      secondaryMuscles: entry.exercise.secondaryMuscles ?? [],
+      bodyParts: entry.exercise.bodyParts ?? [],
+      equipment: entry.exercise.equipment ?? [],
+      instructions: [],
+      tips: [],
+      externalId: entry.exerciseId,
+      source: "history",
+    },
+    sets: entry.sets.map((set) => ({
+      clientId: createClientId(),
+      targetWeightKg: set.weightKg ?? 0,
+      targetReps: set.reps ?? 1,
+      type: set.type ?? "NORMAL",
+      restSeconds: set.restSeconds ?? 90,
+    })),
+  }));
 }
 
 function createDefaultSet(previous?: RoutineBuilderSet): RoutineBuilderSet {
@@ -372,6 +467,124 @@ function createClientId() {
 }
 
 const styles = StyleSheet.create({
+  hero: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
+    padding: 16,
+  },
+  eyebrow: {
+    color: colors.lime,
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    fontWeight: "900",
+  },
+  title: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  subtitle: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+  },
+  summaryTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  summaryStat: {
+    backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  summaryStatLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    marginBottom: 2,
+    textTransform: "uppercase",
+  },
+  summaryStatValue: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  selectorGroup: {
+    gap: 8,
+  },
+  label: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  optionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  optionChip: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  optionChipActive: {
+    backgroundColor: `${colors.lime}1A`,
+    borderColor: colors.lime,
+  },
+  optionText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  optionTextActive: {
+    color: colors.lime,
+  },
+  roundChip: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    minWidth: 42,
+  },
+  roundChipActive: {
+    backgroundColor: `${colors.cyan}1A`,
+    borderColor: colors.cyan,
+  },
+  roundText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  roundTextActive: {
+    color: colors.cyan,
+  },
   actions: {
     flexDirection: "row",
     gap: 8,

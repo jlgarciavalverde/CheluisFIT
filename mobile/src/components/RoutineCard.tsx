@@ -60,6 +60,12 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     borderWidth: 1,
+    gap: 12,
+    padding: 14,
+  },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
     gap: 10,
     padding: 12,
     ...shadow.card,
@@ -76,7 +82,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "900",
   },
   meta: {
@@ -119,6 +125,46 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: "700",
+  },
+  badge: {
+    backgroundColor: `${colors.lime}1A`,
+    borderColor: colors.lime,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    color: colors.lime,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  summaryPill: {
+    backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  summaryLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    marginBottom: 3,
+    textTransform: "uppercase",
+  },
+  summaryValue: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
   },
   actions: {
     flexDirection: "row",

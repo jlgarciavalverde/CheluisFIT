@@ -32,7 +32,6 @@ export function ProfileScreen() {
 
   useEffect(() => {
     if (!user) return;
-
     setFirstName(user.firstName);
     setLastName1(user.lastName1);
     setLastName2(user.lastName2 ?? "");
@@ -55,16 +54,41 @@ export function ProfileScreen() {
       .catch(() => undefined);
   }, [apiFetch]);
 
-  if (!user) {
-    return null;
-  }
+  const latestWeight = useMemo(() => {
+    if (measurements.length === 0) return Number(weightKg || 0);
+    return measurements[measurements.length - 1].weightKg;
+  }, [measurements, weightKg]);
+
+  const weightDisplay = useMemo(() => {
+    const value = Number(weightKg || 0);
+    return weightUnit === "kg" ? `${value.toFixed(0)} kg` : formatWeightLabel(value, "lb");
+  }, [weightKg, weightUnit]);
+
+  const heightDisplay = useMemo(() => {
+    const value = Number(heightCm || 0);
+    return heightUnit === "cm" ? `${value.toFixed(0)} cm` : formatHeightLabel(value, "in");
+  }, [heightCm, heightUnit]);
+
+  const weightInputValue = useMemo(() => {
+    const value = Number(weightKg || 0);
+    if (weightUnit === "kg") return String(value);
+    return String((value * 2.20462).toFixed(1));
+  }, [weightKg, weightUnit]);
+
+  const heightInputValue = useMemo(() => {
+    const value = Number(heightCm || 0);
+    if (heightUnit === "cm") return String(value);
+    return String((value / 2.54).toFixed(1));
+  }, [heightCm, heightUnit]);
+
+  if (!user) return null;
 
   const saveProfile = async () => {
     const nextWeight = Number(weightKg);
     const nextHeight = Number(heightCm);
 
     if (!Number.isFinite(nextWeight) || !Number.isFinite(nextHeight)) {
-      throw new Error("Peso y altura deben ser numeros validos");
+      throw new Error("Peso y altura deben ser números válidos");
     }
 
     const result = await apiFetch<{ data: AuthUser }>("/me", {
@@ -78,6 +102,7 @@ export function ProfileScreen() {
         currentHeightCm: nextHeight,
       }),
     });
+
     setUser(result.data);
     showToast("Perfil actualizado");
   };
@@ -172,7 +197,6 @@ export function ProfileScreen() {
             <MetricTile label="Altura" value={`${user.currentHeightCm} cm`} />
           </View>
         </View>
-      </Section>
 
       <Section title="Datos personales">
         <View style={styles.panel}>
@@ -325,7 +349,170 @@ export function ProfileScreen() {
             onPress={confirmDeleteAccount}
           />
         </View>
-      </Section>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Ajustes</Text>
+            <Text style={styles.cardEyebrow}>Preferencias</Text>
+          </View>
+
+          <View style={styles.settingsList}>
+            <SettingsRow label="Objetivo" value={goal} />
+            <SettingsRow label="Descanso base" value={`${defaultRest} s`} />
+            <SettingsRow label="Frecuencia semanal" value={`${weeklyFrequency} días`} />
+            <SettingsRow label="Unidades" value={`${weightUnit.toUpperCase()} / ${heightUnit.toUpperCase()}`} />
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Datos personales</Text>
+            <Pressable onPress={() => setSheetMode("profile")} style={styles.secondaryAction}>
+              <Text style={styles.secondaryActionText}>Editar</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.dataList}>
+            <View style={styles.dataRow}>
+              <Text style={styles.dataLabel}>Fecha nacimiento</Text>
+              <Text style={styles.dataValue}>{formatDisplayDate(birthDate)}</Text>
+            </View>
+            <View style={styles.dataRow}>
+              <Text style={styles.dataLabel}>Peso actual</Text>
+              <Text style={styles.dataValue}>{weightDisplay}</Text>
+            </View>
+            <View style={styles.dataRow}>
+              <Text style={styles.dataLabel}>Altura actual</Text>
+              <Text style={styles.dataValue}>{heightDisplay}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <Modal transparent visible={sheetMode !== null} animationType="slide" onRequestClose={() => setSheetMode(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSheetMode(null)}>
+          <Pressable style={styles.sheet} onPress={() => undefined}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>
+              {sheetMode === "profile" ? "Editar perfil" : "Nueva medición"}
+            </Text>
+
+            {sheetMode === "profile" ? (
+              <View style={styles.sheetContent}>
+                <TextField
+                  placeholder="Nombre"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  style={styles.input}
+                />
+
+                <View style={styles.rowTwo}>
+                  <TextField
+                    placeholder="Apellido 1"
+                    value={lastName1}
+                    onChangeText={setLastName1}
+                    style={[styles.input, styles.flexInput]}
+                  />
+                  <TextField
+                    placeholder="Apellido 2"
+                    value={lastName2}
+                    onChangeText={setLastName2}
+                    style={[styles.input, styles.flexInput]}
+                  />
+                </View>
+
+                <Pressable onPress={() => setShowDatePicker(true)} style={styles.dateField}>
+                  <Text style={styles.dateFieldText}>{formatDisplayDate(birthDate)}</Text>
+                </Pressable>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={parseDateInput(birthDate || "1990-01-01")}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    maximumDate={new Date()}
+                    onChange={(_, selectedDate) => {
+                      setShowDatePicker(false);
+                      if (selectedDate) setBirthDate(formatIsoDate(selectedDate));
+                    }}
+                  />
+                )}
+
+                <View style={styles.rowTwo}>
+                  <View style={styles.unitFieldWrap}>
+                    <Text style={styles.fieldLabel}>Peso</Text>
+                    <SegmentedControl
+                      value={weightUnit}
+                      options={["kg", "lb"]}
+                      onChange={(option) => setWeightUnit(option as WeightUnit)}
+                    />
+                    <TextField
+                      placeholder={weightUnit === "kg" ? "Peso kg" : "Peso lb"}
+                      keyboardType="numeric"
+                      value={weightInputValue}
+                      onChangeText={handleWeightInput}
+                      style={[styles.input, styles.inputWithTopSpacing]}
+                    />
+                  </View>
+
+                  <View style={styles.unitFieldWrap}>
+                    <Text style={styles.fieldLabel}>Altura</Text>
+                    <SegmentedControl
+                      value={heightUnit}
+                      options={["cm", "in"]}
+                      onChange={(option) => setHeightUnit(option as HeightUnit)}
+                    />
+                    <TextField
+                      placeholder={heightUnit === "cm" ? "Altura cm" : "Altura in"}
+                      keyboardType="numeric"
+                      value={heightInputValue}
+                      onChangeText={handleHeightInput}
+                      style={[styles.input, styles.inputWithTopSpacing]}
+                    />
+                  </View>
+                </View>
+
+                <Button label="Guardar perfil" onPress={() => saveProfile().catch(showError)} />
+              </View>
+            ) : (
+              <View style={styles.sheetContent}>
+                <Text style={styles.fieldLabel}>Unidades</Text>
+                <SegmentedControl
+                  value={weightUnit}
+                  options={["kg", "lb"]}
+                  onChange={(option) => setWeightUnit(option as WeightUnit)}
+                />
+
+                <View style={styles.miniFieldGroup}>
+                  <TextField
+                    placeholder={weightUnit === "kg" ? "Peso kg" : "Peso lb"}
+                    keyboardType="numeric"
+                    value={weightInputValue}
+                    onChangeText={handleWeightInput}
+                    style={styles.input}
+                  />
+                  <TextField
+                    placeholder={heightUnit === "cm" ? "Altura cm" : "Altura in"}
+                    keyboardType="numeric"
+                    value={heightInputValue}
+                    onChangeText={handleHeightInput}
+                    style={styles.input}
+                  />
+                </View>
+
+                <View style={styles.previewCard}>
+                  <Text style={styles.previewLabel}>Vista previa</Text>
+                  <Text style={styles.previewValue}>
+                    {weightDisplay} · {heightDisplay}
+                  </Text>
+                </View>
+
+                <Button label="Guardar medición" onPress={() => saveMeasurement().catch(showError)} />
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -362,10 +549,122 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
-  flex: {
+  heroInner: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  avatarWrap: {
+    alignItems: "center",
+    backgroundColor: colors.lime,
+    borderRadius: 18,
+    height: 66,
+    justifyContent: "center",
+    width: 66,
+  },
+  avatarText: {
+    color: colors.background,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  heroTextWrap: {
     flex: 1,
   },
-  name: {
+  heroName: {
+    color: colors.text,
+    fontSize: typography.title,
+    fontWeight: "900",
+  },
+  heroEmail: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  smallAction: {
+    backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  smallActionText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  metricGrid: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 14,
+    padding: 16,
+  },
+  cardHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  cardEyebrow: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  cardTitle: {
+    color: colors.text,
+    fontSize: typography.title,
+    fontWeight: "900",
+  },
+  primaryAction: {
+    backgroundColor: colors.lime,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  primaryActionText: {
+    color: colors.background,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  secondaryAction: {
+    backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  secondaryActionText: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  valueRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  metaSmall: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  summaryValue: {
     color: colors.text,
     fontSize: 18,
     fontWeight: "900",
@@ -391,7 +690,156 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
-    padding: 12,
+  },
+  dataRow: {
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  dataLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  dataValue: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  sheetBackdrop: {
+    backgroundColor: "rgba(0,0,0,0.62)",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "88%",
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    paddingTop: 10,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    backgroundColor: colors.border,
+    borderRadius: 999,
+    height: 4,
+    marginBottom: 16,
+    width: 48,
+  },
+  sheetTitle: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: "900",
+    marginBottom: 16,
+  },
+  sheetContent: {
+    gap: 14,
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    color: colors.text,
+    minHeight: 48,
+    paddingHorizontal: 12,
+  },
+  rowTwo: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  flexInput: {
+    flex: 1,
+  },
+  dateField: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+  },
+  dateFieldText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  fieldLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    textTransform: "uppercase",
+  },
+  inputWithTopSpacing: {
+    marginTop: 10,
+  },
+  unitFieldWrap: {
+    flex: 1,
+  },
+  segmentedWrap: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden",
+    padding: 4,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 8,
+  },
+  segmentButtonActive: {
+    backgroundColor: colors.lime,
+    borderRadius: 999,
+  },
+  segmentButtonText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textAlign: "center",
+    textTransform: "uppercase",
+  },
+  segmentButtonTextActive: {
+    color: colors.background,
+  },
+  miniFieldGroup: {
+    gap: 10,
+  },
+  previewCard: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+  },
+  previewLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  previewValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 6,
   },
   dangerText: {
     color: colors.error,
@@ -399,3 +847,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+

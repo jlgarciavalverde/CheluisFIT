@@ -55,9 +55,10 @@ export function RoutineExerciseBlock({
           <Text style={styles.kicker}>#{index + 1}</Text>
           <Text style={styles.title}>{item.exercise.name}</Text>
           <Text style={styles.meta}>
-            {item.exercise.targetMuscles.join(", ")} · {item.exercise.equipment.join(", ")}
+            {item.exercise.targetMuscles.join(", ") || "Músculo principal"} · {item.exercise.equipment.join(", ") || "Sin equipo"}
           </Text>
         </View>
+
         <View style={[styles.iconRow, !(canMoveUp || canMoveDown) && styles.iconRowDisabled]}>
           <IconButton label="Subir ejercicio" icon={ArrowUp} onPress={onMoveUp} />
           <IconButton label="Bajar ejercicio" icon={ArrowDown} onPress={onMoveDown} />
@@ -144,13 +145,26 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   setSummary: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  setValue: {
+    color: colors.text,
+    fontSize: 13,
     fontWeight: "900",
   },
   rest: {
     color: colors.muted,
     fontSize: 12,
     fontWeight: "800",
+  },
+  inlineActions: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "flex-end",
   },
   actions: {
     flexDirection: "row",

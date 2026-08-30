@@ -44,6 +44,14 @@ export function ExercisesScreen() {
     [apiFetch],
   );
 
+  const clearFilters = () => {
+    setQuery("");
+    setTargetMuscle("");
+    setEquipment("");
+    setBodyPart("");
+    setFavoritesOnly(false);
+  };
+
   const search = useCallback(async () => {
     setLoading(true);
     try {

@@ -4,6 +4,7 @@ import type { DashboardData, WorkoutSession } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { effectiveSets, totalVolume } from "../utils/workout";
 import { BottomSheet } from "../components/BottomSheet";
+import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { MetricTile } from "../components/MetricTile";
@@ -27,11 +28,11 @@ export function HistoryScreen() {
     setLoading(true);
     try {
       const [dashboardResult, sessionsResult] = await Promise.all([
-        apiFetch<{ data: DashboardData }>("/me/dashboard"),
-        apiFetch<{ data: WorkoutSession[] }>("/me/workout-sessions?limit=20"),
+        apiFetch<{ data: DashboardData | null }>("/me/dashboard"),
+        apiFetch<{ data: WorkoutSession[] | null }>("/me/workout-sessions?limit=20"),
       ]);
-      setDashboard(dashboardResult.data);
-      setSessions(sessionsResult.data);
+      setDashboard(dashboardResult?.data ?? null);
+      setSessions(sessionsResult?.data ?? []);
       setError(null);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Error");
@@ -82,6 +83,14 @@ export function HistoryScreen() {
   const currentWeight = (trend.length > 0 ? trend[trend.length - 1].weightKg : null) ?? 0;
   const workoutsThisWeek = dashboard?.workoutsThisWeek ?? 0;
 
+  const currentWeight = useMemo(() => {
+    const trend = dashboard?.bodyWeightTrend ?? [];
+    if (!trend.length) return "0.0";
+    return (trend.at(-1)?.weightKg ?? 0).toFixed(1);
+  }, [dashboard]);
+
+  const chartValues = (dashboard?.bodyWeightTrend ?? []).map((point) => point.weightKg);
+
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <View style={styles.metricGrid}>
@@ -107,7 +116,6 @@ export function HistoryScreen() {
             <Text style={styles.summaryLabel}>kg actuales</Text>
           </View>
         </View>
-      </Section>
 
       <Section title="Evolucion peso corporal">
         <View style={styles.chartPanel}>
@@ -120,9 +128,36 @@ export function HistoryScreen() {
         </View>
       </Section>
 
-      <Section title="Historial de entrenos">
-        <WorkoutHistoryList sessions={sessions} onSelect={setSelected} />
-      </Section>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Resumen semanal</Text>
+          <View style={styles.summaryGrid}>
+            <Text style={styles.summaryText}>{Math.round(weeklyVolume)} kg</Text>
+            <Text style={styles.summaryText}>{weeklySets} series</Text>
+            <Text style={styles.summaryText}>{currentWeight} kg</Text>
+          </View>
+        </View>
+
+        {chartValues.length > 0 ? (
+          <View style={styles.chartCard}>
+            <Text style={styles.cardTitle}>Peso corporal</Text>
+            <ProgressChart values={chartValues} />
+          </View>
+        ) : (
+          <View style={styles.chartCard}>
+            <Text style={styles.cardTitle}>Peso corporal</Text>
+            <Text style={styles.emptyChartText}>Todavía no hay mediciones suficientes para mostrar tendencia.</Text>
+          </View>
+        )}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Últimas sesiones</Text>
+          {sessions.length === 0 ? (
+            <EmptyState title="Sin historial" message="Completa entrenos y aparecerán aquí tus métricas semanales." />
+          ) : (
+            <WorkoutHistoryList sessions={sessions} onSelect={setSelected} />
+          )}
+        </View>
+      </View>
 
       <BottomSheet visible={Boolean(selected)} onClose={() => setSelected(null)}>
         {selected ? (
@@ -131,9 +166,9 @@ export function HistoryScreen() {
               {formatDate(selected.performedAt)}
             </Text>
             <Text style={styles.sheetMeta}>
-              {selected.status === "COMPLETED" ? "Completado" : "En progreso"} ·{" "}
-              {Math.round(totalVolume(selected))} kg volumen
+              {selected.status === "COMPLETED" ? "Completado" : "En progreso"} · {Math.round(totalVolume(selected))} kg volumen
             </Text>
+
             {selected.exercises.map((exercise) => (
               <View key={exercise.id} style={styles.exerciseBlock}>
                 <Text style={styles.exerciseName}>{exercise.exercise.name}</Text>
@@ -158,7 +193,7 @@ export function HistoryScreen() {
                 </View>
               </View>
             ))}
-          </>
+          </View>
         ) : null}
       </BottomSheet>
     </Screen>
@@ -179,6 +214,29 @@ function isThisWeek(value: string) {
 }
 
 const styles = StyleSheet.create({
+  stack: {
+    gap: 16,
+  },
+  headerCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+  },
+  eyebrow: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: 6,
+    textTransform: "uppercase",
+  },
+  title: {
+    color: colors.text,
+    fontSize: typography.title,
+    fontWeight: "900",
+  },
   metricGrid: {
     flexDirection: "row",
     gap: 10,
@@ -224,6 +282,34 @@ const styles = StyleSheet.create({
     padding: 12,
     ...shadow.card,
   },
+  chartCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+  },
+  cardTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+  emptyChartText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  sheetContent: {
+    gap: 10,
+  },
   sheetTitle: {
     color: colors.text,
     fontSize: 20,
@@ -234,12 +320,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   exerciseBlock: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
     gap: 4,
-    padding: 12,
+    padding: 10,
   },
   exerciseName: {
     color: colors.text,

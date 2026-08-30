@@ -31,11 +31,16 @@ export function Screen({ children, refreshing, onRefresh }: Props) {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.background,
+    flex: 1,
+  },
   content: {
     backgroundColor: colors.background,
     gap: 18,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 128,
+    paddingTop: 12,
   },
 });

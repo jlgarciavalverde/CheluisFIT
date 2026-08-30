@@ -74,11 +74,21 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "900",
     textTransform: "capitalize",
   },
-  meta: {
+  metaRow: {
+    gap: 2,
+  },
+  metaLabel: {
     color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  metaValue: {
+    color: colors.text,
     fontSize: 12,
     fontWeight: "600",
   },
@@ -94,7 +104,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     color: colors.lime,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.3,
     overflow: "hidden",

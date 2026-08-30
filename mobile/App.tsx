@@ -46,7 +46,11 @@ function AppShell() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return (
+      <SafeAreaView style={styles.app}>
+        <AuthScreen />
+      </SafeAreaView>
+    );
   }
 
   return (
