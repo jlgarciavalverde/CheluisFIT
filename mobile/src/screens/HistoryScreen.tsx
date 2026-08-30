@@ -50,22 +50,6 @@ export function HistoryScreen() {
     setRefreshing(false);
   };
 
-  if (loading && !refreshing) {
-    return (
-      <Screen>
-        <LoadingState title="Cargando historial" />
-      </Screen>
-    );
-  }
-
-  if (error) {
-    return (
-      <Screen>
-        <ErrorState title="No se pudo cargar" message={error} onRetry={load} />
-      </Screen>
-    );
-  }
-
   const thisWeekSessions = useMemo(
     () => sessions.filter((session) => isThisWeek(session.performedAt)),
     [sessions],
@@ -88,6 +72,22 @@ export function HistoryScreen() {
   const weeklyConsistency = workoutsThisWeek
     ? Math.min(100, Math.round((workoutsThisWeek / 5) * 100))
     : 0;
+
+  if (loading && !refreshing) {
+    return (
+      <Screen>
+        <LoadingState title="Cargando historial" />
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen>
+        <ErrorState title="No se pudo cargar" message={error} onRetry={load} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
