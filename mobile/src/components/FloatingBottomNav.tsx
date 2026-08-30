@@ -19,9 +19,11 @@ export function FloatingBottomNav({ state, navigation }: BottomTabBarProps) {
   const leftRoutes = visibleRoutes.slice(0, 2);
   const rightRoutes = visibleRoutes.slice(2);
 
+  const hasActiveSession = Boolean(activeSession);
+
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
-      <View style={styles.bar}>
+      <View style={[styles.bar, hasActiveSession && styles.barActive]}>
         <View style={styles.side}>{leftRoutes.map(renderItem)}</View>
         <ActiveWorkoutOrb
           session={activeSession}
@@ -71,9 +73,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 74,
+    minHeight: 72,
     paddingHorizontal: 10,
     ...shadow.card,
+  },
+  barActive: {
+    borderColor: "rgba(163, 230, 53, 0.35)",
+    shadowColor: colors.lime,
+    shadowOpacity: 0.12,
   },
   side: {
     flex: 1,
@@ -84,7 +91,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radius.md,
     flex: 1,
-    minHeight: 46,
+    minHeight: 44,
     justifyContent: "center",
     gap: 3,
     paddingHorizontal: 4,

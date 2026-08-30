@@ -128,13 +128,6 @@ export function ActiveWorkoutScreen() {
     ]);
   };
 
-  const totalExerciseCount = session.exercises.length;
-  const totalCompletedSets = completedSets(session);
-  const totalSessionSets = totalSets(session);
-  const totalVolumeKg = Math.round(totalVolume(session));
-  const trainingMinutes = formatDuration(session.startedAt);
-  const statusLabel = session.status === "COMPLETED" ? "Completado" : "En curso";
-
   return (
     <Screen>
       <Section title="Entreno actual">
@@ -143,9 +136,9 @@ export function ActiveWorkoutScreen() {
         </Text>
         <StatStrip
           items={[
-            { label: "Series", value: `${totalCompletedSets}/${totalSessionSets}` },
-            { label: "Volumen", value: `${totalVolumeKg} kg` },
-            { label: "Duracion", value: trainingMinutes },
+            { label: "Series", value: `${completedSets(session)}/${totalSets(session)}` },
+            { label: "Volumen", value: `${Math.round(totalVolume(session))} kg` },
+            { label: "Duracion", value: formatDuration(session.startedAt) },
           ]}
         />
         {restTotal > 0 ? (
@@ -174,24 +167,6 @@ export function ActiveWorkoutScreen() {
         />
       </Section>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Resumen de la sesion</Text>
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Ejercicios</Text>
-            <Text style={styles.summaryValue}>{totalExerciseCount}</Text>
-          </View>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Series</Text>
-            <Text style={styles.summaryValue}>{totalSessionSets}</Text>
-          </View>
-          <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Volumen</Text>
-            <Text style={styles.summaryValue}>{totalVolumeKg} kg</Text>
-          </View>
-        </View>
-      </View>
-
       <WorkoutSummaryPanel summary={session.muscleSummary} />
 
       <Section title="Ejercicios">
@@ -209,21 +184,7 @@ export function ActiveWorkoutScreen() {
             onCompleteSet={(setId, restSeconds) => completeSet(setId, restSeconds).catch(showError)}
             onEditSet={setEditingSet}
           />
-        ) : (
-          session.exercises.map((exercise) => (
-            <ActiveWorkoutExerciseCard
-              key={exercise.id}
-              workoutExercise={exercise}
-              onAddSet={(workoutExercise) =>
-                addSet(workoutExercise.id, workoutExercise.sets.at(-1)).catch(showError)
-              }
-              onCompleteSet={(setId, restSeconds) =>
-                completeSet(setId, restSeconds).catch(showError)
-              }
-              onEditSet={setEditingSet}
-            />
-          ))
-        )}
+        ))}
       </Section>
 
       <Button

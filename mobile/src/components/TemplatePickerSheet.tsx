@@ -32,20 +32,13 @@ export function TemplatePickerSheet({
 const styles = StyleSheet.create({
   title: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "900",
-  },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 12,
-    lineHeight: 18,
   },
   row: {
     backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 6,
+    gap: 4,
     padding: 12,
   },
   name: {
@@ -53,30 +46,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
-  rowMeta: {
-    flexDirection: "row",
-    gap: 6,
-  },
   meta: {
     color: colors.muted,
     fontSize: 12,
-  },
-  emptyState: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 4,
-    padding: 14,
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 12,
-    lineHeight: 18,
   },
 });

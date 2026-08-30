@@ -304,30 +304,6 @@ const styles = StyleSheet.create({
     height: 220,
     width: "100%",
   },
-  infoGrid: {
-    gap: 8,
-    marginTop: 12,
-  },
-  infoCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 4,
-    padding: 10,
-  },
-  metaLabel: {
-    color: colors.muted,
-    fontSize: 9,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
-  metaValue: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "800",
-  },
   actions: {
     flexDirection: "row",
     gap: 8,

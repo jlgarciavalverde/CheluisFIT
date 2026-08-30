@@ -21,7 +21,6 @@ export function ExerciseFilterBar({
   onFavoritesOnlyChange,
   onInRoutineOnlyChange,
   onQueryChange,
-  onResetFilters,
   onSearch,
   onTargetMuscleChange,
   onUsedRecentlyOnlyChange,
@@ -40,7 +39,6 @@ export function ExerciseFilterBar({
   onFavoritesOnlyChange?: (value: boolean) => void;
   onInRoutineOnlyChange?: (value: boolean) => void;
   onQueryChange: (value: string) => void;
-  onResetFilters?: () => void;
   onSearch: () => void;
   onTargetMuscleChange?: (value: string) => void;
   onUsedRecentlyOnlyChange?: (value: boolean) => void;
@@ -148,7 +146,7 @@ export function ExerciseFilterBar({
             />
           ) : null}
         </View>
-      </BottomSheet>
+      ) : null}
     </View>
   );
 }
@@ -235,9 +233,5 @@ const styles = StyleSheet.create({
   chipRow: {
     gap: spacing.sm,
     paddingRight: spacing.md,
-  },
-  sheetActions: {
-    flexDirection: "row",
-    gap: 8,
   },
 });

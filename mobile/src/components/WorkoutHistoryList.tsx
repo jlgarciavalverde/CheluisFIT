@@ -151,11 +151,12 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 8,
     justifyContent: "space-between",
   },
   title: {
     color: colors.text,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
   },
   badge: {
@@ -209,15 +210,6 @@ const styles = StyleSheet.create({
   focusText: {
     color: colors.textSoft,
     fontSize: 12,
-    fontWeight: "700",
-  },
-  divider: {
-    color: colors.muted,
-    fontSize: 12,
-  },
-  muscles: {
-    color: colors.muted,
-    fontSize: 11,
     fontWeight: "700",
   },
 });

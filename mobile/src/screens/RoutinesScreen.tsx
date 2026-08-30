@@ -36,23 +36,7 @@ export function RoutinesScreen() {
       .catch(() => undefined);
   }, [apiFetch]);
 
-  const loadRecentSessions = useCallback(() => {
-    apiFetch<{ data: WorkoutSession[] }>("/me/workout-sessions?limit=10")
-      .then((result) => setRecentSessions(result.data ?? []))
-      .catch(() => setRecentSessions([]));
-  }, [apiFetch]);
-
-  const totalExercises = templates.reduce((sum, template) => sum + template.exercises.length, 0);
-  const totalSets = templates.reduce(
-    (sum, template) => sum + template.exercises.reduce((exerciseSum, exercise) => exerciseSum + exercise.sets.length, 0),
-    0,
-  );
-  const recommendedTemplate = templates[0];
-
-  useEffect(() => {
-    loadTemplates();
-    loadRecentSessions();
-  }, [loadTemplates, loadRecentSessions]);
+  useEffect(loadTemplates, [loadTemplates]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", loadTemplates);
@@ -125,39 +109,8 @@ export function RoutinesScreen() {
           />
         </View>
 
-        {recommendedTemplate ? (
-          <View style={styles.quickSummary}>
-            <Text style={styles.quickSummaryLabel}>Ruta rápida</Text>
-            <Text style={styles.quickSummaryText}>{recommendedTemplate.name}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.sourceGrid}>
-        <SourceOptionCard
-          accent="lime"
-          description="Configura un plan desde cero con tus objetivos y frecuencia."
-          title="Desde cero"
-          onPress={beginFromBlank}
-          recommended
-        />
-        <SourceOptionCard
-          accent="cyan"
-          description="Usa un entrenamiento anterior como base para tu nueva rutina."
-          title="Entrenos previos"
-          onPress={() => setHistoryOpen(true)}
-        />
-        <SourceOptionCard
-          accent="surface"
-          description="Copia una estructura ya validada y personalízala."
-          title="Plantillas"
-          onPress={() => setPickerOpen(true)}
-        />
-      </View>
-
-      <Section title="Mis rutinas">
         {templates.length === 0 ? (
-          <EmptyState title="Sin rutinas" message="Crea una plantilla para entrenar más rápido." />
+          <EmptyState title="Sin rutinas" message="Crea una plantilla para entrenar mas rapido." />
         ) : (
           templates.map((template) => (
             <RoutineCard
@@ -179,8 +132,7 @@ export function RoutinesScreen() {
         onClose={() => setPickerOpen(false)}
         onPick={(template) => {
           setPickerOpen(false);
-          setBuilderSession(null);
-          setBuilderTemplate(template);
+          cloneTemplate(template).catch(showError);
         }}
       />
 

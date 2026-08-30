@@ -127,10 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setBooting(false);
       }
-
-      setToken(storedToken);
-      setUserState(nextUser);
-      setBooting(false);
     }
 
     restoreSession().catch(() => {
