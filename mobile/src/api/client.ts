@@ -1,8 +1,5 @@
-import { Platform } from "react-native";
-
 export const defaultApiBase =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === "android" ? "http://10.0.2.2:3000/api" : "http://127.0.0.1:3000/api");
+  process.env.EXPO_PUBLIC_API_URL ?? "https://cheluisfit-api.onrender.com/api";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
