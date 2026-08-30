@@ -2,6 +2,7 @@ export const colors = {
   background: "#070A0F",
   surface: "#10151F",
   surface2: "#171D29",
+  surface3: "#1D2633",
   border: "#263244",
   text: "#F8FAFC",
   muted: "#94A3B8",
@@ -25,12 +26,17 @@ export const spacing = {
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
+  xl: 20,
+  xxl: 24,
 } as const;
 
 export const radius = {
-  sm: 6,
-  md: 8,
+  xs: 8,
+  sm: 12,
+  md: 16,
+  lg: 20,
+  xl: 24,
+  full: 999,
 } as const;
 
 export const typography = {
@@ -38,6 +44,7 @@ export const typography = {
   title: 22,
   body: 15,
   caption: 12,
+  meta: 11,
 } as const;
 
 export const opacity = {
@@ -53,5 +60,12 @@ export const shadow = {
     shadowOpacity: 0.35,
     shadowRadius: 18,
     elevation: 12,
+  },
+  card: {
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
 } as const;

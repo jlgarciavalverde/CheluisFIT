@@ -13,11 +13,13 @@ export function Section({ title, children }: { title: string; children: ReactNod
 
 const styles = StyleSheet.create({
   section: {
-    gap: 10,
+    gap: 12,
   },
   title: {
     color: colors.text,
-    fontSize: typography.body,
+    fontSize: 12,
     fontWeight: "900",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
   },
 });

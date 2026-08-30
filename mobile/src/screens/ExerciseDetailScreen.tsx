@@ -64,9 +64,28 @@ export function ExerciseDetailScreen({
     <>
       <Section title={exercise.name}>
         <Image source={{ uri: exercise.gifUrl }} style={styles.image} resizeMode="contain" />
-        <Text style={styles.meta}>
-          {exercise.targetMuscles.join(", ")} · {exercise.equipment.join(", ")}
-        </Text>
+
+        <View style={styles.infoGrid}>
+          <View style={styles.infoCard}>
+            <Text style={styles.metaLabel}>Músculo principal</Text>
+            <Text style={styles.metaValue}>{exercise.targetMuscles.join(", ") || "Sin musculo"}</Text>
+          </View>
+          <View style={styles.infoCard}>
+            <Text style={styles.metaLabel}>Secundario</Text>
+            <Text style={styles.metaValue}>{exercise.secondaryMuscles.join(", ") || "No especificado"}</Text>
+          </View>
+          <View style={styles.infoCard}>
+            <Text style={styles.metaLabel}>Equipo</Text>
+            <Text style={styles.metaValue}>{exercise.equipment.join(", ") || "Sin equipo"}</Text>
+          </View>
+          {exercise.bodyParts?.length ? (
+            <View style={styles.infoCard}>
+              <Text style={styles.metaLabel}>Zona</Text>
+              <Text style={styles.metaValue}>{exercise.bodyParts.join(", ")}</Text>
+            </View>
+          ) : null}
+        </View>
+
         <StatStrip
           items={[
             { label: "PR", value: `${lastProgress?.maxWeightKg ?? 0} kg` },
@@ -154,6 +173,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 230,
     width: "100%",
+  },
+  infoGrid: {
+    gap: 8,
+    marginTop: 12,
+  },
+  infoCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+    padding: 10,
+  },
+  metaLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  metaValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "800",
   },
   actions: {
     flexDirection: "row",

@@ -29,7 +29,7 @@ export function WorkoutHistoryList({
           0,
         );
         const topMuscles = session.muscleSummary
-          .slice(0, 3)
+          .slice(0, 2)
           .map((point) => `${point.muscle} ${point.effectiveSets}`)
           .join(" · ");
 
@@ -43,19 +43,22 @@ export function WorkoutHistoryList({
             <View style={styles.header}>
               <Text style={styles.title}>{formatDate(session.performedAt)}</Text>
               <Text style={[styles.badge, session.status === "COMPLETED" && styles.badgeDone]}>
-                {session.status === "COMPLETED" ? "Completado" : "Activo"}
+                {session.status === "COMPLETED" ? "OK" : "Act"}
               </Text>
             </View>
-            <Text style={styles.meta}>
-              {session.exercises.map((exercise) => exercise.exercise.name).slice(0, 3).join(" · ")}
+
+            <Text style={styles.meta} numberOfLines={1}>
+              {session.exercises.map((exercise) => exercise.exercise.name).slice(0, 2).join(" · ")}
             </Text>
-            <StatStrip
-              items={[
-                { label: "Volumen", value: `${Math.round(volumeKg)} kg` },
-                { label: "Series", value: setCount },
-                { label: "Duracion", value: formatSessionDuration(session) },
-              ]}
-            />
+
+            <View style={styles.inlineStats}>
+              <Text style={styles.statValue}>{Math.round(volumeKg)} kg</Text>
+              <Text style={styles.divider}>·</Text>
+              <Text style={styles.statValue}>{setCount} series</Text>
+              <Text style={styles.divider}>·</Text>
+              <Text style={styles.statValue}>{formatSessionDuration(session)}</Text>
+            </View>
+
             {topMuscles ? <Text style={styles.muscles}>{topMuscles}</Text> : null}
           </Pressable>
         );
@@ -65,7 +68,10 @@ export function WorkoutHistoryList({
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString();
+  return new Date(value).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 function formatSessionDuration(session: WorkoutSession) {
@@ -84,27 +90,26 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
-    gap: 4,
+    gap: 6,
     padding: 12,
   },
   header: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
     justifyContent: "space-between",
   },
   title: {
     color: colors.text,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "900",
   },
   badge: {
     backgroundColor: `${colors.cyan}1A`,
     borderColor: colors.cyan,
-    borderRadius: radius.sm,
+    borderRadius: 999,
     borderWidth: 1,
     color: colors.cyan,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
     overflow: "hidden",
     paddingHorizontal: 8,
@@ -120,9 +125,23 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
   },
-  muscles: {
+  inlineStats: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  statValue: {
     color: colors.text,
     fontSize: 12,
     fontWeight: "800",
+  },
+  divider: {
+    color: colors.muted,
+    fontSize: 12,
+  },
+  muscles: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
   },
 });
