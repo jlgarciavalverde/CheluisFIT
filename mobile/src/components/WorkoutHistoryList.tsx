@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { WorkoutSession } from "../api/types";
-import { colors, radius, shadow } from "../theme/tokens";
+import { colors, radius, shadow, withOpacity } from "../theme/tokens";
 import { EmptyState } from "./EmptyState";
 import { StatStrip } from "./StatStrip";
 
@@ -12,7 +12,9 @@ export function WorkoutHistoryList({
   onSelect?: (session: WorkoutSession) => void;
 }) {
   if (sessions.length === 0) {
-    return <EmptyState title="Sin historial" message="Cuando completes entrenos apareceran aqui." />;
+    return (
+      <EmptyState title="Sin historial" message="Cuando completes entrenos apareceran aqui." />
+    );
   }
   const groups = groupByWeek(sessions);
 
@@ -22,58 +24,66 @@ export function WorkoutHistoryList({
         <View key={group.title} style={styles.group}>
           <Text style={styles.groupTitle}>{group.title}</Text>
           {group.sessions.map((session) => {
-        const setCount = session.exercises.reduce(
-          (total, exercise) => total + exercise.sets.length,
-          0,
-        );
-        const volumeKg = session.exercises.reduce(
-          (sessionTotal, exercise) =>
-            sessionTotal +
-            exercise.sets.reduce((setTotal, set) => setTotal + set.weightKg * set.reps, 0),
-          0,
-        );
-        const topMuscles = session.muscleSummary
-          .slice(0, 2)
-          .map((point) => `${point.muscle} ${point.effectiveSets}`)
-          .join(" · ");
-        const isCompleted = session.status === "COMPLETED";
+            const setCount = session.exercises.reduce(
+              (total, exercise) => total + exercise.sets.length,
+              0,
+            );
+            const volumeKg = session.exercises.reduce(
+              (sessionTotal, exercise) =>
+                sessionTotal +
+                exercise.sets.reduce((setTotal, set) => setTotal + set.weightKg * set.reps, 0),
+              0,
+            );
+            const topMuscles = session.muscleSummary
+              .slice(0, 2)
+              .map((point) => `${point.muscle} ${point.effectiveSets}`)
+              .join(" · ");
+            const isCompleted = session.status === "COMPLETED";
 
-        return (
-          <Pressable
-            key={session.id}
-            accessibilityRole="button"
-            onPress={() => onSelect?.(session)}
-            style={[styles.card, isCompleted ? styles.cardDone : styles.cardActive]}
-          >
-            <View style={styles.header}>
-              <Text style={styles.title}>{formatDate(session.performedAt)}</Text>
-              <View style={[styles.badge, isCompleted ? styles.badgeDone : styles.badgeActive]}>
-                <Text style={[styles.badgeText, isCompleted ? styles.badgeTextDone : styles.badgeTextActive]}>
-                  {isCompleted ? "Completado" : "Activo"}
+            return (
+              <Pressable
+                key={session.id}
+                accessibilityRole="button"
+                onPress={() => onSelect?.(session)}
+                style={[styles.card, isCompleted ? styles.cardDone : styles.cardActive]}
+              >
+                <View style={styles.header}>
+                  <Text style={styles.title}>{formatDate(session.performedAt)}</Text>
+                  <View style={[styles.badge, isCompleted ? styles.badgeDone : styles.badgeActive]}>
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        isCompleted ? styles.badgeTextDone : styles.badgeTextActive,
+                      ]}
+                    >
+                      {isCompleted ? "Completado" : "Activo"}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.meta}>
+                  {session.exercises
+                    .map((exercise) => exercise.exercise.name)
+                    .slice(0, 3)
+                    .join(" · ")}
                 </Text>
-              </View>
-            </View>
 
-            <Text style={styles.meta}>
-              {session.exercises.map((exercise) => exercise.exercise.name).slice(0, 3).join(" · ")}
-            </Text>
+                <StatStrip
+                  items={[
+                    { label: "Volumen", value: `${Math.round(volumeKg)} kg` },
+                    { label: "Series", value: setCount },
+                    { label: "Duracion", value: formatSessionDuration(session) },
+                  ]}
+                />
 
-            <StatStrip
-              items={[
-                { label: "Volumen", value: `${Math.round(volumeKg)} kg` },
-                { label: "Series", value: setCount },
-                { label: "Duracion", value: formatSessionDuration(session) },
-              ]}
-            />
-
-            {topMuscles ? (
-              <View style={styles.focus}>
-                <Text style={styles.focusLabel}>Foco</Text>
-                <Text style={styles.focusText}>{topMuscles}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        );
+                {topMuscles ? (
+                  <View style={styles.focus}>
+                    <Text style={styles.focusLabel}>Foco</Text>
+                    <Text style={styles.focusText}>{topMuscles}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
           })}
         </View>
       ))}
@@ -88,7 +98,7 @@ function groupByWeek(sessions: WorkoutSession[]) {
     const date = new Date(session.performedAt);
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay() + 1);
-    const title = `Semana ${weekStart.toLocaleDateString()}`;
+    const title = `Semana ${weekStart.getDate()}/${weekStart.getMonth() + 1}`;
     groups.set(title, [...(groups.get(title) ?? []), session]);
   }
 
@@ -99,7 +109,8 @@ function groupByWeek(sessions: WorkoutSession[]) {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString();
+  const d = new Date(value);
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
 function formatSessionDuration(session: WorkoutSession) {
@@ -156,11 +167,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeDone: {
-    backgroundColor: `${colors.lime}1A`,
+    backgroundColor: withOpacity(colors.lime, 0.10),
     borderColor: colors.lime,
   },
   badgeActive: {
-    backgroundColor: `${colors.cyan}1A`,
+    backgroundColor: withOpacity(colors.cyan, 0.10),
     borderColor: colors.cyan,
   },
   badgeText: {

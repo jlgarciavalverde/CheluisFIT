@@ -41,6 +41,7 @@ export function WorkoutExercisePicker({
     }, 280);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, query, targetMuscle, equipment, bodyPart]);
 
   const search = async () => {
@@ -52,9 +53,7 @@ export function WorkoutExercisePicker({
       if (equipment) params.set("equipment", equipment);
       if (bodyPart) params.set("bodyPart", bodyPart);
 
-      const response = await apiFetch<{ data: Exercise[] }>(
-        `/exercises?${params.toString()}`,
-      );
+      const response = await apiFetch<{ data: Exercise[] }>(`/exercises?${params.toString()}`);
       setResults(response.data);
     } finally {
       setLoading(false);

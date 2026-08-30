@@ -1,5 +1,8 @@
 import { MeasurementUnits, Prisma, TrainingGoal } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import { HttpError } from "../utils/httpError";
+import { verifyPassword } from "../utils/password";
+import { clamp } from "../utils/queryHelpers";
 import { sanitizeUser } from "./authService";
 
 type UpdateProfileInput = {
@@ -44,13 +47,29 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
   return sanitizeUser(user);
 }
 
-export async function listBodyMeasurements(userId: string) {
-  const measurements = await prisma.bodyMeasurement.findMany({
-    where: { userId },
-    orderBy: { measuredAt: "asc" },
-  });
+export async function listBodyMeasurements(
+  userId: string,
+  params?: { limit?: number; offset?: number },
+) {
+  const limit = clamp(params?.limit ?? 100, 1, 500);
+  const offset = Math.max(params?.offset ?? 0, 0);
+  const where = { userId };
+
+  const [total, measurements] = await prisma.$transaction([
+    prisma.bodyMeasurement.count({ where }),
+    prisma.bodyMeasurement.findMany({
+      where,
+      orderBy: { measuredAt: "asc" },
+      skip: offset,
+      take: limit,
+    }),
+  ]);
 
   return {
+    total,
+    count: measurements.length,
+    limit,
+    offset,
     data: measurements.map((measurement) => ({
       id: measurement.id,
       userId: measurement.userId,
@@ -124,6 +143,20 @@ export async function updateTrainingPreference(
   });
 
   return { data: normalizeTrainingPreference(preference) };
+}
+
+export async function deleteAccount(userId: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) {
+    throw new HttpError(404, "User not found");
+  }
+
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    throw new HttpError(401, "Incorrect password");
+  }
+
+  await prisma.user.delete({ where: { id: userId } });
 }
 
 function normalizeTrainingPreference(preference: {

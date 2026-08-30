@@ -2,17 +2,37 @@ import { Platform } from "react-native";
 
 export const defaultApiBase =
   process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === "android"
-    ? "http://10.0.2.2:3000/api"
-    : "http://127.0.0.1:3000/api");
+  (Platform.OS === "android" ? "http://10.0.2.2:3000/api" : "http://127.0.0.1:3000/api");
+
+const REQUEST_TIMEOUT_MS = 15_000;
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 
 export async function parseApiResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+
+  let body: Record<string, unknown> | null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    throw new ApiError("Invalid server response", response.status);
+  }
 
   if (!response.ok) {
-    throw new Error(body?.error ?? "Request failed");
+    throw new ApiError((body?.error as string) ?? "Request failed", response.status);
   }
 
   return body as T;
+}
+
+export function createTimeoutSignal(): AbortSignal {
+  return AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 }

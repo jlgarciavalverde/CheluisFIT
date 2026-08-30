@@ -1,7 +1,8 @@
 import { ExerciseSetType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/httpError";
-import { createWorkoutSession, startWorkoutSession } from "./workoutService";
+import { clamp, ensureExercisesExist } from "../utils/queryHelpers";
+import { startWorkoutSession } from "./workoutService";
 
 type TemplateExerciseInput = {
   exerciseId: string;
@@ -38,14 +39,32 @@ export async function createWorkoutTemplate(userId: string, input: TemplateInput
   return normalizeWorkoutTemplate(template);
 }
 
-export async function listWorkoutTemplates(userId: string) {
-  const templates = await prisma.workoutTemplate.findMany({
-    where: { userId },
-    include: workoutTemplateInclude,
-    orderBy: { updatedAt: "desc" },
-  });
+export async function listWorkoutTemplates(
+  userId: string,
+  params?: { limit?: number; offset?: number },
+) {
+  const limit = clamp(params?.limit ?? 50, 1, 100);
+  const offset = Math.max(params?.offset ?? 0, 0);
+  const where = { userId };
 
-  return { data: templates.map(normalizeWorkoutTemplate) };
+  const [total, templates] = await prisma.$transaction([
+    prisma.workoutTemplate.count({ where }),
+    prisma.workoutTemplate.findMany({
+      where,
+      include: workoutTemplateInclude,
+      orderBy: { updatedAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+  ]);
+
+  return {
+    total,
+    count: templates.length,
+    limit,
+    offset,
+    data: templates.map(normalizeWorkoutTemplate),
+  };
 }
 
 export async function updateWorkoutTemplate(userId: string, templateId: string, input: TemplateInput) {
@@ -66,6 +85,11 @@ export async function updateWorkoutTemplate(userId: string, templateId: string, 
   });
 
   return normalizeWorkoutTemplate(template);
+}
+
+export async function deleteWorkoutTemplate(userId: string, templateId: string) {
+  await ensureTemplateOwnership(userId, templateId);
+  await prisma.workoutTemplate.delete({ where: { id: templateId } });
 }
 
 export async function cloneWorkoutTemplate(userId: string, templateId: string) {
@@ -199,13 +223,3 @@ async function ensureTemplateOwnership(userId: string, templateId: string) {
   }
 }
 
-async function ensureExercisesExist(exerciseIds: string[]) {
-  const uniqueExerciseIds = Array.from(new Set(exerciseIds));
-  const count = await prisma.exercise.count({
-    where: { id: { in: uniqueExerciseIds } },
-  });
-
-  if (count !== uniqueExerciseIds.length) {
-    throw new HttpError(404, "One or more exercises were not found");
-  }
-}

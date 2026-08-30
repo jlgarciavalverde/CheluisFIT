@@ -1,75 +1,170 @@
 import { Plus, Star } from "lucide-react-native";
-import { useState } from "react";
-import { Alert, Image, StyleSheet, Text, View } from "react-native";
-import type { Exercise, ProgressionSuggestion, ProgressPoint, WorkoutSession } from "../api/types";
-import type { ApiFetch } from "../api/types";
+import { useCallback, useEffect, useState } from "react";
+import { Image } from "expo-image";
+import { StyleSheet, Text, View } from "react-native";
+import { showError } from "../utils/errors";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
+import type { ProgressionSuggestion, ProgressPoint, WorkoutSession } from "../api/types";
+import { useAuth } from "../auth/AuthProvider";
+import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
+import { LoadingState } from "../components/LoadingState";
 import { ProgressChart } from "../components/ProgressChart";
+import { Screen } from "../components/Screen";
 import { Section } from "../components/Section";
 import { SegmentedTabs } from "../components/SegmentedTabs";
 import { StatStrip } from "../components/StatStrip";
+import type { ExercisesStackParamList } from "../navigation/types";
 import { colors, radius, shadow } from "../theme/tokens";
 
-export function ExerciseDetailScreen({
-  apiFetch,
-  exercise,
-  favorite,
-  history,
-  metric,
-  progress,
-  progression,
-  onBack,
-  onMetricChange,
-  onToggleFavorite,
-  onAddToActiveWorkout,
-  setMessage,
-}: {
-  apiFetch: ApiFetch;
-  exercise: Exercise;
-  favorite: boolean;
-  history: WorkoutSession[];
-  metric: "weight" | "volume";
-  progress: ProgressPoint[];
-  progression: ProgressionSuggestion | null;
-  onBack: () => void;
-  onMetricChange: (metric: "weight" | "volume") => void;
-  onToggleFavorite: () => void;
-  onAddToActiveWorkout: () => void;
-  setMessage: (value: string) => void;
-}) {
+type RouteProps = NativeStackScreenProps<ExercisesStackParamList, "ExerciseDetail">["route"];
+
+export function ExerciseDetailScreen() {
+  const route = useRoute<RouteProps>();
+  const navigation = useNavigation<NativeStackNavigationProp<ExercisesStackParamList>>();
+  const { apiFetch } = useAuth();
+  const showToast = useToast();
+  const { exercise } = route.params;
+
   const [tab, setTab] = useState<"info" | "progress" | "history" | "routine">("progress");
+  const [metric, setMetric] = useState<"weight" | "volume">("weight");
+  const [progress, setProgress] = useState<ProgressPoint[]>([]);
+  const [progression, setProgression] = useState<ProgressionSuggestion | null>(null);
+  const [favorite, setFavorite] = useState(false);
+  const [history, setHistory] = useState<WorkoutSession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [progressResult, progressionResult, statesResult, sessionsResult] = await Promise.all([
+        apiFetch<{ data: ProgressPoint[] }>(`/exercises/${exercise.id}/progress`),
+        apiFetch<{ data: ProgressionSuggestion }>(`/exercises/${exercise.id}/progression`),
+        apiFetch<{ data: Array<{ exerciseId: string; isFavorite: boolean }> }>(
+          `/me/exercise-states?exerciseIds=${exercise.id}`,
+        ),
+        apiFetch<{ data: WorkoutSession[] }>("/me/workout-sessions?limit=50"),
+      ]);
+      setProgress(progressResult.data);
+      setProgression(progressionResult.data);
+      setFavorite(statesResult.data.find((s) => s.exerciseId === exercise.id)?.isFavorite ?? false);
+      setHistory(
+        sessionsResult.data.filter((s) => s.exercises.some((e) => e.exerciseId === exercise.id)),
+      );
+    } catch (error) {
+      showError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiFetch, exercise.id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const toggleFavorite = async () => {
+    try {
+      if (favorite) {
+        await apiFetch(`/favorite-exercises/${exercise.id}`, { method: "DELETE" });
+        setFavorite(false);
+        showToast("Favorito eliminado");
+      } else {
+        await apiFetch("/favorite-exercises", {
+          method: "POST",
+          body: JSON.stringify({ exerciseId: exercise.id }),
+        });
+        setFavorite(true);
+        showToast("Favorito guardado");
+      }
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const addToActiveWorkout = async () => {
+    try {
+      const active = await apiFetch<{ data: WorkoutSession | null }>("/workout-sessions/active");
+      if (!active.data) {
+        showToast("Empieza una rutina antes de anadir ejercicios");
+        return;
+      }
+      await apiFetch(`/workout-sessions/${active.data.id}/exercises`, {
+        method: "POST",
+        body: JSON.stringify({
+          exerciseId: exercise.id,
+          sets: [{ weightKg: 0, reps: 10, type: "NORMAL", restSeconds: 90 }],
+        }),
+      });
+      showToast("Ejercicio anadido al entreno");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const createRoutineFromExercise = async () => {
+    try {
+      const lastProgress = progress[progress.length - 1];
+      await apiFetch("/workout-templates", {
+        method: "POST",
+        body: JSON.stringify({
+          name: `${exercise.name} base`,
+          exercises: [
+            {
+              exerciseId: exercise.id,
+              sets: [
+                {
+                  targetWeightKg: lastProgress?.maxWeightKg ?? 0,
+                  targetReps: 10,
+                  type: "NORMAL",
+                  restSeconds: 90,
+                },
+                {
+                  targetWeightKg: lastProgress?.maxWeightKg ?? 0,
+                  targetReps: 10,
+                  type: "NORMAL",
+                  restSeconds: 90,
+                },
+                {
+                  targetWeightKg: lastProgress?.maxWeightKg ?? 0,
+                  targetReps: 10,
+                  type: "NORMAL",
+                  restSeconds: 90,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+      showToast("Rutina creada desde ejercicio");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Screen>
+        <LoadingState title="Cargando ejercicio" />
+      </Screen>
+    );
+  }
+
   const chartValues =
     metric === "weight"
       ? progress.map((point) => point.maxWeightKg)
       : progress.map((point) => point.totalVolumeKg);
-  const lastProgress = progress.at(-1);
-
-  const createRoutineFromExercise = async () => {
-    await apiFetch("/workout-templates", {
-      method: "POST",
-      body: JSON.stringify({
-        name: `${exercise.name} base`,
-        exercises: [
-          {
-            exerciseId: exercise.id,
-            sets: [
-              { targetWeightKg: lastProgress?.maxWeightKg ?? 0, targetReps: 10, type: "NORMAL", restSeconds: 90 },
-              { targetWeightKg: lastProgress?.maxWeightKg ?? 0, targetReps: 10, type: "NORMAL", restSeconds: 90 },
-              { targetWeightKg: lastProgress?.maxWeightKg ?? 0, targetReps: 10, type: "NORMAL", restSeconds: 90 },
-            ],
-          },
-        ],
-      }),
-    });
-    setMessage("Rutina creada desde ejercicio");
-  };
+  const lastProgress = progress[progress.length - 1];
 
   return (
-    <>
+    <Screen>
       <Section title={exercise.name}>
         <View style={styles.summaryCard}>
-          <Image source={{ uri: exercise.gifUrl }} style={styles.image} resizeMode="contain" />
+          <Image source={exercise.gifUrl} style={styles.image} contentFit="contain" />
           <Text style={styles.meta}>
             {exercise.targetMuscles.join(", ")} · {exercise.equipment.join(", ")}
           </Text>
@@ -81,25 +176,17 @@ export function ExerciseDetailScreen({
             ]}
           />
           <View style={styles.actions}>
-            <Button label="Volver" variant="ghost" onPress={onBack} />
+            <Button label="Volver" variant="ghost" onPress={() => navigation.goBack()} />
             <Button
               icon={Star}
               variant="secondary"
               label={favorite ? "Quitar fav" : "Favorito"}
-              onPress={onToggleFavorite}
+              onPress={toggleFavorite}
             />
           </View>
           <View style={styles.actions}>
-            <Button
-              icon={Plus}
-              label="Anadir al entreno"
-              onPress={onAddToActiveWorkout}
-            />
-            <Button
-              label="Crear rutina"
-              variant="secondary"
-              onPress={() => createRoutineFromExercise().catch(showError)}
-            />
+            <Button icon={Plus} label="Anadir al entreno" onPress={addToActiveWorkout} />
+            <Button label="Crear rutina" variant="secondary" onPress={createRoutineFromExercise} />
           </View>
         </View>
       </Section>
@@ -123,12 +210,12 @@ export function ExerciseDetailScreen({
               { key: "volume", label: "Volumen" },
             ]}
             value={metric}
-            onChange={(key) => onMetricChange(key as "weight" | "volume")}
+            onChange={(key) => setMetric(key as "weight" | "volume")}
           />
           <View style={styles.chartCard}>
             <ProgressChart
               values={chartValues}
-              labels={progress.map((point) => new Date(point.performedAt).toLocaleDateString())}
+              labels={progress.map((point) => point.performedAt)}
             />
           </View>
           {progression ? (
@@ -167,10 +254,10 @@ export function ExerciseDetailScreen({
             history.slice(0, 8).map((session) => (
               <View key={session.id} style={styles.historyRow}>
                 <Text style={styles.historyTitle}>
-                  {new Date(session.performedAt).toLocaleDateString()}
+                  {formatDate(session.performedAt)}
                 </Text>
                 <Text style={styles.meta}>
-                  {session.exercises.length} ejercicios · {session.status}
+                  {session.exercises.length} ejercicios · {session.status === "COMPLETED" ? "Completado" : "En progreso"}
                 </Text>
               </View>
             ))
@@ -185,16 +272,17 @@ export function ExerciseDetailScreen({
             <Text style={styles.meta}>
               Crea una rutina base con 3 series y luego ajustala en el builder.
             </Text>
-            <Button label="Crear rutina base" onPress={() => createRoutineFromExercise().catch(showError)} />
+            <Button label="Crear rutina base" onPress={createRoutineFromExercise} />
           </View>
         </Section>
       ) : null}
-    </>
+    </Screen>
   );
 }
 
-function showError(error: unknown) {
-  Alert.alert("Error", error instanceof Error ? error.message : "Algo ha fallado");
+function formatDate(value: string) {
+  const d = new Date(value);
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
 const styles = StyleSheet.create({

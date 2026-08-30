@@ -5,6 +5,7 @@ import { requireAuth } from "../middlewares/authMiddleware";
 import { getExerciseStates } from "../services/exerciseService";
 import {
   addBodyMeasurement,
+  deleteAccount,
   getProfile,
   getTrainingPreference,
   listBodyMeasurements,
@@ -13,6 +14,7 @@ import {
 } from "../services/profileService";
 import { listWorkoutSessions } from "../services/workoutService";
 import { getAuthUser } from "../types/auth";
+import { asNumber, asString } from "../utils/queryHelpers";
 
 export const profileRoutes = Router();
 
@@ -23,6 +25,10 @@ const updateProfileSchema = z.object({
   birthDate: z.coerce.date().optional(),
   currentWeightKg: z.number().positive().optional(),
   currentHeightCm: z.number().int().positive().optional(),
+});
+
+const deleteAccountSchema = z.object({
+  password: z.string().min(1),
 });
 
 const bodyMeasurementSchema = z.object({
@@ -62,9 +68,22 @@ profileRoutes.patch("/", async (req, res, next) => {
   }
 });
 
+profileRoutes.delete("/", async (req, res, next) => {
+  try {
+    const { password } = deleteAccountSchema.parse(req.body);
+    await deleteAccount(getAuthUser(req).id, password);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 profileRoutes.get("/body-measurements", async (req, res, next) => {
   try {
-    const measurements = await listBodyMeasurements(getAuthUser(req).id);
+    const measurements = await listBodyMeasurements(getAuthUser(req).id, {
+      limit: asNumber(req.query.limit),
+      offset: asNumber(req.query.offset),
+    });
     res.json(measurements);
   } catch (error) {
     next(error);
@@ -133,15 +152,3 @@ profileRoutes.get("/workout-sessions", async (req, res, next) => {
   }
 });
 
-function asNumber(value: unknown) {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function asString(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}

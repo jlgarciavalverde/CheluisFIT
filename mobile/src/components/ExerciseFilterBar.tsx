@@ -93,7 +93,11 @@ export function ExerciseFilterBar({
             ) : null}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
             {onFavoritesOnlyChange ? (
               <FilterChip
                 label="Favoritos"

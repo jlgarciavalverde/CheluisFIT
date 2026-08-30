@@ -7,6 +7,7 @@ import {
   removeFavoriteExercise,
 } from "../services/favoriteService";
 import { getAuthUser } from "../types/auth";
+import { asNumber } from "../utils/queryHelpers";
 
 export const favoriteRoutes = Router();
 
@@ -18,7 +19,10 @@ favoriteRoutes.use(requireAuth);
 
 favoriteRoutes.get("/", async (req, res, next) => {
   try {
-    const favorites = await listFavoriteExercises(getAuthUser(req).id);
+    const favorites = await listFavoriteExercises(getAuthUser(req).id, {
+      limit: asNumber(req.query.limit),
+      offset: asNumber(req.query.offset),
+    });
     res.json(favorites);
   } catch (error) {
     next(error);

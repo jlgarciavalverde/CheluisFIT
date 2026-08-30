@@ -2,13 +2,7 @@ import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { colors, radius } from "../theme/tokens";
 
-export function ProgressChart({
-  values,
-  labels,
-}: {
-  values: number[];
-  labels?: string[];
-}) {
+export function ProgressChart({ values, labels }: { values: number[]; labels?: string[] }) {
   const max = useMemo(() => Math.max(...values, 1), [values]);
 
   if (values.length === 0) {
@@ -25,11 +19,15 @@ export function ProgressChart({
         const label = labels?.slice(-8)[index];
 
         return (
-        <View key={`${value}-${index}`} style={styles.barWrap}>
-          <View style={[styles.bar, { height: Math.max(14, (value / max) * 120) }]} />
-          <Text style={styles.barLabel}>{Math.round(value)}</Text>
-          {label ? <Text numberOfLines={1} style={styles.dateLabel}>{compactDate(label)}</Text> : null}
-        </View>
+          <View key={`${value}-${index}`} style={styles.barWrap}>
+            <View style={[styles.bar, { height: Math.max(14, (value / max) * 120) }]} />
+            <Text style={styles.barLabel}>{Math.round(value)}</Text>
+            {label ? (
+              <Text numberOfLines={1} style={styles.dateLabel}>
+                {compactDate(label)}
+              </Text>
+            ) : null}
+          </View>
         );
       })}
     </View>
@@ -37,8 +35,11 @@ export function ProgressChart({
 }
 
 function compactDate(value: string) {
-  const [day, month] = value.split("/");
-  return day && month ? `${day}/${month}` : value.slice(0, 5);
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return value.slice(0, 5);
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  return `${day}/${month}`;
 }
 
 const styles = StyleSheet.create({

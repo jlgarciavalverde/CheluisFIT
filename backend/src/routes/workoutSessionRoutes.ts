@@ -6,7 +6,11 @@ import {
   addWorkoutExercise,
   addWorkoutSet,
   createWorkoutSession,
+  deleteWorkoutSession,
   getActiveWorkoutSession,
+  getWorkoutSession,
+  removeWorkoutExercise,
+  removeWorkoutSet,
   startWorkoutSession,
   updateWorkoutSession,
   updateWorkoutSet,
@@ -107,6 +111,50 @@ workoutSessionRoutes.post("/start", async (req, res, next) => {
     const session = await startWorkoutSession(getAuthUser(req).id, input);
 
     res.status(201).json({ data: session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workoutSessionRoutes.get("/:sessionId", async (req, res, next) => {
+  try {
+    const session = await getWorkoutSession(getAuthUser(req).id, req.params.sessionId);
+    res.json({ data: session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workoutSessionRoutes.delete("/:sessionId", async (req, res, next) => {
+  try {
+    await deleteWorkoutSession(getAuthUser(req).id, req.params.sessionId);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+workoutSessionRoutes.delete("/:sessionId/exercises/:workoutExerciseId", async (req, res, next) => {
+  try {
+    const session = await removeWorkoutExercise(
+      getAuthUser(req).id,
+      req.params.sessionId,
+      req.params.workoutExerciseId,
+    );
+    res.json({ data: session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workoutSessionRoutes.delete("/:sessionId/sets/:setId", async (req, res, next) => {
+  try {
+    const session = await removeWorkoutSet(
+      getAuthUser(req).id,
+      req.params.sessionId,
+      req.params.setId,
+    );
+    res.json({ data: session });
   } catch (error) {
     next(error);
   }

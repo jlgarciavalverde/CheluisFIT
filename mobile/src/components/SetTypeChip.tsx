@@ -4,9 +4,9 @@ import { radius, setTypeColors } from "../theme/tokens";
 
 const setTypeStyles: Record<ExerciseSetType, { label: string; color: string }> = {
   NORMAL: { label: "Normal", color: setTypeColors.NORMAL },
-  WARMUP: { label: "Warmup", color: setTypeColors.WARMUP },
-  SUPERSET: { label: "Superset", color: setTypeColors.SUPERSET },
-  DROPSET: { label: "Dropset", color: setTypeColors.DROPSET },
+  WARMUP: { label: "Calent.", color: setTypeColors.WARMUP },
+  SUPERSET: { label: "Biserie", color: setTypeColors.SUPERSET },
+  DROPSET: { label: "Descend.", color: setTypeColors.DROPSET },
 };
 
 export function SetTypeChip({ type, compact }: { type: ExerciseSetType; compact?: boolean }) {

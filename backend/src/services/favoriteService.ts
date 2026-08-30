@@ -1,16 +1,33 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/httpError";
+import { clamp } from "../utils/queryHelpers";
 import { normalizeLocalExercise } from "./exerciseService";
 
-export async function listFavoriteExercises(userId: string) {
-  const favorites = await prisma.favoriteExercise.findMany({
-    where: { userId },
-    include: { exercise: true },
-    orderBy: { createdAt: "desc" },
-  });
+export async function listFavoriteExercises(
+  userId: string,
+  params?: { limit?: number; offset?: number },
+) {
+  const limit = clamp(params?.limit ?? 50, 1, 100);
+  const offset = Math.max(params?.offset ?? 0, 0);
+  const where = { userId };
+
+  const [total, favorites] = await prisma.$transaction([
+    prisma.favoriteExercise.count({ where }),
+    prisma.favoriteExercise.findMany({
+      where,
+      include: { exercise: true },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+  ]);
 
   return {
+    total,
+    count: favorites.length,
+    limit,
+    offset,
     data: favorites.map((favorite) => ({
       id: favorite.id,
       createdAt: favorite.createdAt.toISOString(),

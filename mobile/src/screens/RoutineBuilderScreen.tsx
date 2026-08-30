@@ -1,8 +1,15 @@
 import { Plus, Save, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { showError } from "../utils/errors";
+import type {
+  NativeStackNavigationProp,
+  NativeStackScreenProps,
+} from "@react-navigation/native-stack";
 import type { Exercise, ExerciseSetType, WorkoutSet, WorkoutTemplate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
+import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/Button";
 import {
   RoutineBuilderExercise,
@@ -14,30 +21,27 @@ import { Section } from "../components/Section";
 import { SetEditorSheet } from "../components/SetEditorSheet";
 import { TextField } from "../components/TextField";
 import { WorkoutExercisePicker } from "../components/WorkoutExercisePicker";
+import type { RoutinesStackParamList } from "../navigation/types";
 import { colors } from "../theme/tokens";
 
-type EditingSet = {
-  exerciseClientId: string;
-  set: RoutineBuilderSet;
-};
+type RouteProps = NativeStackScreenProps<RoutinesStackParamList, "RoutineBuilder">["route"];
+type EditingSet = { exerciseClientId: string; set: RoutineBuilderSet };
 
-export function RoutineBuilderScreen({
-  template,
-  onCancel,
-  onSaved,
-}: {
-  template?: WorkoutTemplate | null;
-  onCancel: () => void;
-  onSaved: () => void;
-}) {
+export function RoutineBuilderScreen() {
+  const route = useRoute<RouteProps>();
+  const navigation = useNavigation<NativeStackNavigationProp<RoutinesStackParamList>>();
   const { apiFetch } = useAuth();
+  const showToast = useToast();
+  const template = route.params.template;
+
   const [name, setName] = useState(template?.name ?? "Rutina nueva");
   const [notes, setNotes] = useState(template?.notes ?? "");
-  const [exercises, setExercises] = useState<RoutineBuilderExercise[]>(
-    () => templateToBuilderExercises(template),
+  const [exercises, setExercises] = useState<RoutineBuilderExercise[]>(() =>
+    templateToBuilderExercises(template),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<EditingSet | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const totals = useMemo(() => {
     const setCount = exercises.reduce((total, exercise) => total + exercise.sets.length, 0);
@@ -49,7 +53,6 @@ export function RoutineBuilderScreen({
       Math.round(exercises.length * 4 + setCount * 1.5),
       exercises.length ? 20 : 0,
     );
-
     return { exercises: exercises.length, sets: setCount, effectiveSets, estimatedMinutes };
   }, [exercises]);
 
@@ -71,6 +74,7 @@ export function RoutineBuilderScreen({
       return;
     }
 
+    setSaving(true);
     await apiFetch(template ? `/workout-templates/${template.id}` : "/workout-templates", {
       method: template ? "PUT" : "POST",
       body: JSON.stringify({
@@ -89,7 +93,8 @@ export function RoutineBuilderScreen({
         })),
       }),
     });
-    onSaved();
+    showToast("Rutina guardada");
+    navigation.goBack();
   };
 
   return (
@@ -98,14 +103,12 @@ export function RoutineBuilderScreen({
         <TextField value={name} onChangeText={setName} />
         <TextField value={notes} onChangeText={setNotes} placeholder="Notas" />
         <Text style={styles.meta}>
-          Paso 1 de 4 · Datos, ejercicios, series y revision
-        </Text>
-        <Text style={styles.meta}>
-          {totals.exercises} ejercicios · {totals.sets} series objetivo · {totals.effectiveSets} efectivas · {totals.estimatedMinutes} min
+          {totals.exercises} ejercicios · {totals.sets} series objetivo · {totals.effectiveSets}{" "}
+          efectivas · {totals.estimatedMinutes} min
         </Text>
         <View style={styles.actions}>
           <Button icon={Plus} label="Anadir ejercicio" onPress={() => setPickerOpen(true)} />
-          <Button icon={X} label="Cancelar" variant="ghost" onPress={onCancel} />
+          <Button icon={X} label="Cancelar" variant="ghost" onPress={() => navigation.goBack()} />
         </View>
       </Section>
 
@@ -114,7 +117,7 @@ export function RoutineBuilderScreen({
           <Button label="3x10" variant="secondary" onPress={() => applyPreset(3, 10)} />
           <Button label="4x8" variant="secondary" onPress={() => applyPreset(4, 8)} />
           <Button label="5x5" variant="secondary" onPress={() => applyPreset(5, 5)} />
-          <Button label="Warm + 3" variant="secondary" onPress={applyWarmupPreset} />
+          <Button label="Calent + 3" variant="secondary" onPress={applyWarmupPreset} />
         </View>
       </Section>
 
@@ -142,7 +145,12 @@ export function RoutineBuilderScreen({
         )}
       </Section>
 
-      <Button icon={Save} label="Guardar rutina" onPress={() => save().catch(showError)} />
+      <Button
+        icon={Save}
+        label={saving ? "Guardando..." : "Guardar rutina"}
+        disabled={saving}
+        onPress={() => save().catch((error) => { setSaving(false); showError(error); })}
+      />
 
       <WorkoutExercisePicker
         apiFetch={apiFetch}
@@ -169,7 +177,10 @@ export function RoutineBuilderScreen({
     setExercises((current) =>
       current.map((exercise) =>
         exercise.clientId === exerciseClientId
-          ? { ...exercise, sets: [...exercise.sets, createDefaultSet(exercise.sets.at(-1))] }
+          ? {
+              ...exercise,
+              sets: [...exercise.sets, createDefaultSet(exercise.sets[exercise.sets.length - 1])],
+            }
           : exercise,
       ),
     );
@@ -201,45 +212,61 @@ export function RoutineBuilderScreen({
   }
 
   function applyPreset(setCount: number, reps: number) {
-    setExercises((current) =>
-      current.map((exercise) => ({
-        ...exercise,
-        sets: Array.from({ length: setCount }).map(() => ({
-          clientId: createClientId(),
-          targetWeightKg: exercise.sets[0]?.targetWeightKg ?? 60,
-          targetReps: reps,
-          type: "NORMAL" as const,
-          restSeconds: exercise.sets[0]?.restSeconds ?? 90,
-        })),
-      })),
-    );
+    if (exercises.length === 0) return;
+    Alert.alert("Aplicar preset", `Reemplazar todas las series con ${setCount}x${reps}?`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Aplicar",
+        onPress: () =>
+          setExercises((current) =>
+            current.map((exercise) => ({
+              ...exercise,
+              sets: Array.from({ length: setCount }).map(() => ({
+                clientId: createClientId(),
+                targetWeightKg: exercise.sets[0]?.targetWeightKg ?? 60,
+                targetReps: reps,
+                type: "NORMAL" as const,
+                restSeconds: exercise.sets[0]?.restSeconds ?? 90,
+              })),
+            })),
+          ),
+      },
+    ]);
   }
 
   function applyWarmupPreset() {
-    setExercises((current) =>
-      current.map((exercise) => {
-        const baseWeight = exercise.sets[0]?.targetWeightKg ?? 60;
-        return {
-          ...exercise,
-          sets: [
-            {
-              clientId: createClientId(),
-              targetWeightKg: Math.max(Math.round(baseWeight * 0.55), 0),
-              targetReps: 10,
-              type: "WARMUP",
-              restSeconds: 60,
-            },
-            ...Array.from({ length: 3 }).map(() => ({
-              clientId: createClientId(),
-              targetWeightKg: baseWeight,
-              targetReps: 8,
-              type: "NORMAL" as const,
-              restSeconds: 120,
-            })),
-          ],
-        };
-      }),
-    );
+    if (exercises.length === 0) return;
+    Alert.alert("Aplicar preset", "Reemplazar todas las series con Warmup + 3 de trabajo?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Aplicar",
+        onPress: () =>
+          setExercises((current) =>
+            current.map((exercise) => {
+              const baseWeight = exercise.sets[0]?.targetWeightKg ?? 60;
+              return {
+                ...exercise,
+                sets: [
+                  {
+                    clientId: createClientId(),
+                    targetWeightKg: Math.max(Math.round(baseWeight * 0.55), 0),
+                    targetReps: 10,
+                    type: "WARMUP",
+                    restSeconds: 60,
+                  },
+                  ...Array.from({ length: 3 }).map(() => ({
+                    clientId: createClientId(),
+                    targetWeightKg: baseWeight,
+                    targetReps: 8,
+                    type: "NORMAL" as const,
+                    restSeconds: 120,
+                  })),
+                ],
+              };
+            }),
+          ),
+      },
+    ]);
   }
 
   function updateSet(
@@ -270,9 +297,7 @@ export function RoutineBuilderScreen({
   }
 
   function removeExercise(exerciseClientId: string) {
-    setExercises((current) =>
-      current.filter((exercise) => exercise.clientId !== exerciseClientId),
-    );
+    setExercises((current) => current.filter((exercise) => exercise.clientId !== exerciseClientId));
   }
 
   function removeSet(exerciseClientId: string, setClientId: string) {
@@ -290,9 +315,7 @@ export function RoutineBuilderScreen({
 
   function moveExercise(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
-
     if (nextIndex < 0 || nextIndex >= exercises.length) return;
-
     const next = [...exercises];
     const [item] = next.splice(index, 1);
     next.splice(nextIndex, 0, item);
@@ -300,7 +323,7 @@ export function RoutineBuilderScreen({
   }
 }
 
-function templateToBuilderExercises(template?: WorkoutTemplate | null): RoutineBuilderExercise[] {
+function templateToBuilderExercises(template: WorkoutTemplate | null): RoutineBuilderExercise[] {
   return (
     template?.exercises.map((templateExercise) => ({
       clientId: createClientId(),
@@ -346,10 +369,6 @@ function builderSetToWorkoutSet(set: RoutineBuilderSet): WorkoutSet {
 
 function createClientId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function showError(error: unknown) {
-  Alert.alert("Error", error instanceof Error ? error.message : "Algo ha fallado");
 }
 
 const styles = StyleSheet.create({

@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Exercise } from "../api/types";
 import { colors, radius, shadow } from "../theme/tokens";
 
-export function ExerciseRow({
+export const ExerciseRow = memo(function ExerciseRow({
   exercise,
   onPress,
   badges = [],
@@ -21,7 +22,8 @@ export function ExerciseRow({
       <View style={styles.copy}>
         <Text style={styles.title}>{exercise.name}</Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {exercise.targetMuscles.join(", ") || "Sin musculo"} · {exercise.equipment.join(", ") || "sin equipo"}
+          {exercise.targetMuscles.join(", ") || "Sin musculo"} ·{" "}
+          {exercise.equipment.join(", ") || "sin equipo"}
         </Text>
 
         {visibleBadges.length > 0 ? (
@@ -36,7 +38,7 @@ export function ExerciseRow({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

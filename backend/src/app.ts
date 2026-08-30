@@ -3,6 +3,7 @@ import "dotenv/config";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import morgan from "morgan";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { authRoutes } from "./routes/authRoutes";
@@ -23,6 +24,7 @@ export const app = express();
 app.disable("x-powered-by");
 
 app.use(helmet());
+if (!isTest) app.use(morgan("short"));
 app.use(cors({ origin: validateCorsOrigin }));
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT ?? "100kb" }));
 
@@ -91,12 +93,15 @@ app.use(
       return;
     }
 
+    console.error("Unhandled error:", error);
     res.status(500).json({
       error:
         isProduction || !(error instanceof Error) ? "Internal server error" : error.message,
     });
   },
 );
+
+const allowedOrigins = buildAllowedOrigins();
 
 function validateCorsOrigin(
   origin: string | undefined,
@@ -107,8 +112,6 @@ function validateCorsOrigin(
     return;
   }
 
-  const allowedOrigins = getAllowedOrigins();
-
   if (allowedOrigins.has(origin)) {
     callback(null, true);
     return;
@@ -117,13 +120,15 @@ function validateCorsOrigin(
   callback(new HttpError(403, "Origin not allowed"));
 }
 
-function getAllowedOrigins() {
+function buildAllowedOrigins() {
   const raw = process.env.CORS_ORIGIN ?? process.env.CORS_ALLOWED_ORIGINS ?? "";
   const fallbackOrigins = isProduction
     ? []
     : [
         "http://localhost:8081",
         "http://127.0.0.1:8081",
+        "http://localhost:8082",
+        "http://127.0.0.1:8082",
         "http://localhost:19006",
         "http://127.0.0.1:19006",
         "http://localhost:3000",

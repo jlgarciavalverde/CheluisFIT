@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 
 const EXERCISEDB_URL = "https://oss.exercisedb.dev/api/v1/exercises";
 const EXTERNAL_CACHE_TTL_MS = 30 * 60 * 1000;
+const EXTERNAL_CACHE_MAX_SIZE = 200;
 const EXTERNAL_PAGE_SIZE = 25;
 
 type ExerciseLibraryItem = {
@@ -332,6 +333,17 @@ export async function searchExternalExercises(q: string, limit = 20, offset = 0)
 
   if (!externalCache) {
     externalCache = new Map();
+  }
+
+  if (externalCache.size >= EXTERNAL_CACHE_MAX_SIZE) {
+    const now = Date.now();
+    for (const [key, entry] of externalCache) {
+      if (entry.expiresAt <= now) externalCache.delete(key);
+    }
+    if (externalCache.size >= EXTERNAL_CACHE_MAX_SIZE) {
+      const oldest = externalCache.keys().next().value;
+      if (oldest !== undefined) externalCache.delete(oldest);
+    }
   }
 
   externalCache.set(cacheKey, {

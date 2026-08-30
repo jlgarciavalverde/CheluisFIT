@@ -30,10 +30,10 @@ export const setTypeColors = {
 } as const;
 
 export const setTypeBackgrounds = {
-  NORMAL: `${setTypeColors.NORMAL}1F`,
-  WARMUP: `${setTypeColors.WARMUP}1F`,
-  SUPERSET: `${setTypeColors.SUPERSET}1F`,
-  DROPSET: `${setTypeColors.DROPSET}1F`,
+  NORMAL: withOpacity(setTypeColors.NORMAL, 0.12),
+  WARMUP: withOpacity(setTypeColors.WARMUP, 0.12),
+  SUPERSET: withOpacity(setTypeColors.SUPERSET, 0.12),
+  DROPSET: withOpacity(setTypeColors.DROPSET, 0.12),
 } as const;
 
 export const spacing = {
@@ -52,7 +52,7 @@ export const radius = {
   xl: 24,
 } as const;
 
-export const typography = {
+export const fontSize = {
   display: 34,
   title: 22,
   section: 16,
@@ -60,6 +60,22 @@ export const typography = {
   meta: 12,
   caption: 11,
 } as const;
+
+export const fontWeight = {
+  regular: "400" as const,
+  medium: "600" as const,
+  semibold: "700" as const,
+  bold: "800" as const,
+  black: "900" as const,
+};
+
+export const lineHeight = {
+  tight: 1.15,
+  normal: 1.35,
+  relaxed: 1.5,
+} as const;
+
+export const typography = fontSize;
 
 export const opacity = {
   disabled: 0.55,
@@ -96,3 +112,10 @@ export const motion = {
   normal: 220,
   slow: 320,
 } as const;
+
+export function withOpacity(hex: string, alpha: number): string {
+  const a = Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `${hex}${a}`;
+}

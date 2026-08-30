@@ -2,13 +2,7 @@ import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text } from "react-native";
 import { colors, motion, radius, shadow, spacing } from "../theme/tokens";
 
-export function Toast({
-  message,
-  onDone,
-}: {
-  message: string;
-  onDone: () => void;
-}) {
+export function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-8)).current;
 

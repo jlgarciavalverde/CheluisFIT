@@ -50,13 +50,27 @@ model User {
   email              String                  @unique
   passwordHash       String
   role               Role                    @default(USER)
+  failedLoginAttempts Int                    @default(0)
+  lockedUntil        DateTime?
   measurements       BodyMeasurement[]
   workoutSessions    WorkoutSession[]
   workoutTemplates   WorkoutTemplate[]
   favoriteExercises  FavoriteExercise[]
+  refreshTokens      RefreshToken[]
   trainingPreference UserTrainingPreference?
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model UserTrainingPreference {
@@ -118,6 +132,7 @@ model WorkoutSession {
   updatedAt   DateTime             @updatedAt
 
   @@index([userId, performedAt])
+  @@index([userId, status])
 }
 
 model WorkoutExercise {

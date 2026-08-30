@@ -5,11 +5,13 @@ import { requireAuth } from "../middlewares/authMiddleware";
 import {
   cloneWorkoutTemplate,
   createWorkoutTemplate,
+  deleteWorkoutTemplate,
   listWorkoutTemplates,
   startWorkoutFromTemplate,
   updateWorkoutTemplate,
 } from "../services/templateService";
 import { getAuthUser } from "../types/auth";
+import { asNumber } from "../utils/queryHelpers";
 
 export const templateRoutes = Router();
 
@@ -42,7 +44,10 @@ templateRoutes.use(requireAuth);
 
 templateRoutes.get("/", async (req, res, next) => {
   try {
-    const templates = await listWorkoutTemplates(getAuthUser(req).id);
+    const templates = await listWorkoutTemplates(getAuthUser(req).id, {
+      limit: asNumber(req.query.limit),
+      offset: asNumber(req.query.offset),
+    });
     res.json(templates);
   } catch (error) {
     next(error);
@@ -71,6 +76,15 @@ templateRoutes.put("/:templateId", async (req, res, next) => {
     );
 
     res.json({ data: template });
+  } catch (error) {
+    next(error);
+  }
+});
+
+templateRoutes.delete("/:templateId", async (req, res, next) => {
+  try {
+    await deleteWorkoutTemplate(getAuthUser(req).id, req.params.templateId);
+    res.status(204).end();
   } catch (error) {
     next(error);
   }

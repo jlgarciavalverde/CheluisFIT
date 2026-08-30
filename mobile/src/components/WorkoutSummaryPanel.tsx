@@ -10,7 +10,10 @@ export function WorkoutSummaryPanel({ summary }: { summary: MuscleSummaryPoint[]
       <Text style={styles.title}>Resumen del entreno</Text>
       <Text style={styles.copy}>Series efectivas por musculo · objetivo sesion F2</Text>
       {summary.length === 0 ? (
-        <EmptyState title="Sin series efectivas" message="Las series de calentamiento no cuentan." />
+        <EmptyState
+          title="Sin series efectivas"
+          message="Las series de calentamiento no cuentan."
+        />
       ) : (
         summary.map((point) => <MuscleVolumeMeter key={point.muscle} point={point} />)
       )}

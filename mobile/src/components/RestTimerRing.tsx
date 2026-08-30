@@ -14,7 +14,7 @@ export function RestTimerRing({
   return (
     <View style={[styles.ring, { borderColor: color }]}>
       <Text style={styles.value}>{formatSeconds(secondsLeft)}</Text>
-      <Text style={styles.label}>rest</Text>
+      <Text style={styles.label}>descanso</Text>
     </View>
   );
 }

@@ -2,24 +2,11 @@ import { Router } from "express";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { listWorkoutSessions } from "../services/workoutService";
 import { getAuthUser } from "../types/auth";
+import { asNumber } from "../utils/queryHelpers";
 
 export const userRoutes = Router();
 
 userRoutes.use(requireAuth);
-
-userRoutes.get("/me/workout-sessions", async (req, res, next) => {
-  try {
-    const sessions = await listWorkoutSessions({
-      userId: getAuthUser(req).id,
-      limit: asNumber(req.query.limit),
-      offset: asNumber(req.query.offset),
-    });
-
-    res.json(sessions);
-  } catch (error) {
-    next(error);
-  }
-});
 
 userRoutes.get("/:userId/workout-sessions", async (req, res, next) => {
   try {
@@ -39,12 +26,3 @@ userRoutes.get("/:userId/workout-sessions", async (req, res, next) => {
     next(error);
   }
 });
-
-function asNumber(value: unknown) {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}

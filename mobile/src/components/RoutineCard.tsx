@@ -1,18 +1,21 @@
-import { Copy, Dumbbell, Pencil } from "lucide-react-native";
+import { Copy, Dumbbell, Pencil, Trash2 } from "lucide-react-native";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { WorkoutTemplate } from "../api/types";
-import { colors, radius, shadow } from "../theme/tokens";
+import { colors, radius, shadow, withOpacity } from "../theme/tokens";
 import { Button } from "./Button";
 
-export function RoutineCard({
+export const RoutineCard = memo(function RoutineCard({
   template,
   onClone,
+  onDelete,
   onEdit,
   onOpen,
   onStart,
 }: {
   template: WorkoutTemplate;
   onClone: () => void;
+  onDelete: () => void;
   onEdit: () => void;
   onOpen?: () => void;
   onStart: () => void;
@@ -36,17 +39,20 @@ export function RoutineCard({
 
       <View style={styles.summary}>
         <Text style={styles.summaryLabel}>Vista rápida</Text>
-        <Text style={styles.summaryText}>{template.exercises.length} ejercicios · {setCount} series · {estimatedMinutes} min</Text>
+        <Text style={styles.summaryText}>
+          {template.exercises.length} ejercicios · {setCount} series · {estimatedMinutes} min
+        </Text>
       </View>
 
       <View style={styles.actions}>
         <Button icon={Dumbbell} label="Empezar" onPress={onStart} />
         <Button icon={Pencil} label="Editar" variant="ghost" onPress={onEdit} />
         <Button icon={Copy} label="Clonar" variant="secondary" onPress={onClone} />
+        <Button icon={Trash2} label="Eliminar" variant="ghost" onPress={onDelete} />
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -79,7 +85,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   pill: {
-    backgroundColor: `${colors.cyan}1A`,
+    backgroundColor: withOpacity(colors.cyan, 0.10),
     borderColor: colors.cyan,
     borderRadius: radius.sm,
     borderWidth: 1,

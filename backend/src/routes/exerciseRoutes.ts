@@ -12,6 +12,7 @@ import {
   getExerciseRecords,
 } from "../services/workoutService";
 import { getAuthUser } from "../types/auth";
+import { asNumber, asString } from "../utils/queryHelpers";
 
 export const exerciseRoutes = Router();
 
@@ -109,15 +110,3 @@ exerciseRoutes.get("/:id", async (req, res, next) => {
   }
 });
 
-function asString(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-function asNumber(value: unknown) {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}

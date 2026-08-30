@@ -1,13 +1,15 @@
 import { Check, Plus } from "lucide-react-native";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { memo } from "react";
+import { Image } from "expo-image";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { WorkoutSession } from "../api/types";
-import { colors, radius } from "../theme/tokens";
+import { colors, radius, withOpacity } from "../theme/tokens";
 import { Button } from "./Button";
 import { getSetTypeColor, SetTypeChip } from "./SetTypeChip";
 
 type WorkoutExercise = WorkoutSession["exercises"][number];
 
-export function ActiveWorkoutExerciseCard({
+export const ActiveWorkoutExerciseCard = memo(function ActiveWorkoutExerciseCard({
   workoutExercise,
   nextSetId,
   onAddSet,
@@ -22,7 +24,12 @@ export function ActiveWorkoutExerciseCard({
 }) {
   return (
     <View style={styles.card}>
-      <Image source={{ uri: workoutExercise.exercise.gifUrl }} style={styles.image} resizeMode="contain" />
+      <Image
+        source={workoutExercise.exercise.gifUrl}
+        style={styles.image}
+        contentFit="contain"
+        recyclingKey={workoutExercise.exercise.id}
+      />
       <View style={styles.header}>
         <Text style={styles.title}>{workoutExercise.exercise.name}</Text>
         <Text style={styles.meta}>
@@ -64,10 +71,15 @@ export function ActiveWorkoutExerciseCard({
           );
         })}
       </View>
-      <Button icon={Plus} label="Anadir serie" variant="secondary" onPress={() => onAddSet(workoutExercise)} />
+      <Button
+        icon={Plus}
+        label="Anadir serie"
+        variant="secondary"
+        onPress={() => onAddSet(workoutExercise)}
+      />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -124,7 +136,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   nextSet: {
-    backgroundColor: `${colors.lime}12`,
+    backgroundColor: withOpacity(colors.lime, 0.07),
   },
   setSummary: {
     fontSize: 13,

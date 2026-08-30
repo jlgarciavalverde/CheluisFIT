@@ -1,9 +1,33 @@
 import type { ReactNode } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { Keyboard, RefreshControl, ScrollView, StyleSheet } from "react-native";
 import { colors } from "../theme/tokens";
 
-export function Screen({ children }: { children: ReactNode }) {
-  return <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>;
+type Props = {
+  children: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+};
+
+export function Screen({ children, refreshing, onRefresh }: Props) {
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={Keyboard.dismiss}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing ?? false}
+            onRefresh={onRefresh}
+            tintColor={colors.lime}
+            colors={[colors.lime]}
+          />
+        ) : undefined
+      }
+    >
+      {children}
+    </ScrollView>
+  );
 }
 
 const styles = StyleSheet.create({

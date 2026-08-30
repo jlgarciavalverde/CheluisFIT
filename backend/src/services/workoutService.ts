@@ -2,6 +2,7 @@ import { ExerciseSetType, Prisma, WorkoutSessionStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/httpError";
 import { computeProgressMetrics } from "../utils/progressMetrics";
+import { clamp, ensureExercisesExist } from "../utils/queryHelpers";
 
 type CreateWorkoutSessionInput = {
   performedAt?: Date;
@@ -66,7 +67,6 @@ export async function createWorkoutSession(
   input: CreateWorkoutSessionInput,
   status: WorkoutSessionStatus = WorkoutSessionStatus.COMPLETED,
 ) {
-  await ensureUserExists(userId);
   await ensureExercisesExist(input.exercises.map((exercise) => exercise.exerciseId));
 
   const performedAt = input.performedAt ?? new Date();
@@ -114,8 +114,6 @@ export async function startWorkoutSession(userId: string, input: CreateWorkoutSe
 }
 
 export async function getActiveWorkoutSession(userId: string) {
-  await ensureUserExists(userId);
-
   const session = await prisma.workoutSession.findFirst({
     where: { userId, status: WorkoutSessionStatus.IN_PROGRESS },
     include: workoutSessionInclude,
@@ -126,8 +124,6 @@ export async function getActiveWorkoutSession(userId: string) {
 }
 
 export async function listWorkoutSessions(params: ListWorkoutSessionsParams) {
-  await ensureUserExists(params.userId);
-
   const limit = clamp(params.limit ?? 20, 1, 100);
   const offset = Math.max(params.offset ?? 0, 0);
   const where = { userId: params.userId };
@@ -181,6 +177,67 @@ export async function updateWorkoutSession(
   });
 
   return normalizeWorkoutSession(session);
+}
+
+export async function getWorkoutSession(userId: string, sessionId: string) {
+  const session = await prisma.workoutSession.findFirst({
+    where: { id: sessionId, userId },
+    include: workoutSessionInclude,
+  });
+
+  if (!session) {
+    throw new HttpError(404, "Workout session not found");
+  }
+
+  return normalizeWorkoutSession(session);
+}
+
+export async function deleteWorkoutSession(userId: string, sessionId: string) {
+  await ensureWorkoutSessionOwnership(userId, sessionId);
+  await prisma.workoutSession.delete({ where: { id: sessionId } });
+}
+
+export async function removeWorkoutExercise(
+  userId: string,
+  sessionId: string,
+  workoutExerciseId: string,
+) {
+  await ensureActiveWorkoutSessionOwnership(userId, sessionId);
+
+  const workoutExercise = await prisma.workoutExercise.findFirst({
+    where: { id: workoutExerciseId, workoutSessionId: sessionId },
+    select: { id: true },
+  });
+
+  if (!workoutExercise) {
+    throw new HttpError(404, "Workout exercise not found");
+  }
+
+  await prisma.workoutExercise.delete({ where: { id: workoutExerciseId } });
+  return getWorkoutSession(userId, sessionId);
+}
+
+export async function removeWorkoutSet(
+  userId: string,
+  sessionId: string,
+  setId: string,
+) {
+  await ensureActiveWorkoutSessionOwnership(userId, sessionId);
+
+  const set = await prisma.exerciseSet.findFirst({
+    where: {
+      id: setId,
+      workoutExercise: { workoutSessionId: sessionId },
+    },
+    select: { id: true },
+  });
+
+  if (!set) {
+    throw new HttpError(404, "Exercise set not found");
+  }
+
+  await prisma.exerciseSet.delete({ where: { id: setId } });
+  return getWorkoutSession(userId, sessionId);
 }
 
 export async function addWorkoutExercise(
@@ -309,7 +366,6 @@ async function getWorkoutSessionForUser(userId: string, sessionId: string) {
 }
 
 export async function getExerciseProgress(userId: string, exerciseId: string) {
-  await ensureUserExists(userId);
   await ensureExercisesExist([exerciseId]);
 
   const workoutExercises = await prisma.workoutExercise.findMany({
@@ -349,7 +405,6 @@ export async function getExerciseProgress(userId: string, exerciseId: string) {
 }
 
 export async function getExerciseProgression(userId: string, exerciseId: string) {
-  await ensureUserExists(userId);
   const exercise = await prisma.exercise.findUnique({
     where: { id: exerciseId },
   });
@@ -389,7 +444,7 @@ export async function getExerciseProgression(userId: string, exerciseId: string)
       data: {
         status: "NO_HISTORY",
         suggestion: null,
-        message: "No hay historial suficiente para sugerir progresion.",
+        message: "Sin historial para este ejercicio.",
       },
     };
   }
@@ -431,9 +486,9 @@ export async function getExerciseProgression(userId: string, exerciseId: string)
       },
       message: allSetsHitTarget
         ? bodyweight
-          ? "Cumpliste el rango: sube repeticiones manteniendo peso corporal."
-          : `Cumpliste el rango: prueba a subir ${incrementKg} kg.`
-        : "Mantén el peso y busca una repeticion mas por serie.",
+          ? "Reps objetivo alcanzadas: sube reps manteniendo peso corporal."
+          : `Reps objetivo alcanzadas: prueba subir ${incrementKg} kg.`
+        : "Mantiene el peso y apunta a una rep mas por serie.",
     },
   };
 }
@@ -578,17 +633,6 @@ function addMuscleSets(
   summary.set(key, current);
 }
 
-async function ensureUserExists(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  });
-
-  if (!user) {
-    throw new HttpError(404, "User not found");
-  }
-}
-
 async function ensureNoActiveWorkoutSession(userId: string) {
   const activeSession = await prisma.workoutSession.findFirst({
     where: { userId, status: WorkoutSessionStatus.IN_PROGRESS },
@@ -626,30 +670,8 @@ async function ensureActiveWorkoutSessionOwnership(userId: string, sessionId: st
   }
 }
 
-async function ensureExercisesExist(exerciseIds: string[]) {
-  const uniqueExerciseIds = Array.from(new Set(exerciseIds));
-  const count = await prisma.exercise.count({
-    where: {
-      id: {
-        in: uniqueExerciseIds,
-      },
-    },
-  });
-
-  if (count !== uniqueExerciseIds.length) {
-    throw new HttpError(404, "One or more exercises were not found");
-  }
-}
-
 function getProgressionIncrementKg(bodyParts: string[]) {
   const lowerBodyParts = new Set(["upper legs", "lower legs", "legs"]);
   return bodyParts.some((bodyPart) => lowerBodyParts.has(bodyPart.toLowerCase())) ? 5 : 2.5;
 }
 
-function clamp(value: number, min: number, max: number) {
-  if (Number.isNaN(value)) {
-    return min;
-  }
-
-  return Math.min(Math.max(value, min), max);
-}

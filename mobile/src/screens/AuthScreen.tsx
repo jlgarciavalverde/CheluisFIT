@@ -61,20 +61,22 @@ export function AuthScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.brandBlock}>
           <Text style={styles.eyebrow}>CheluisFIT</Text>
-          <Text style={styles.brand}>Train heavier.</Text>
+          <Text style={styles.brand}>Entrena mas fuerte.</Text>
           <Text style={styles.subtitle}>Registra entrenos, rutinas y progreso real.</Text>
         </View>
 
         <SegmentedTabs
           tabs={[
-            { key: "login", label: "Login" },
+            { key: "login", label: "Iniciar sesion" },
             { key: "register", label: "Registro" },
           ]}
           value={mode}
           onChange={(key) => setMode(key as "login" | "register")}
         />
 
-        <TextField value={apiBase} onChangeText={setApiBase} autoCapitalize="none" />
+        {__DEV__ ? (
+          <TextField value={apiBase} onChangeText={setApiBase} autoCapitalize="none" />
+        ) : null}
 
         {mode === "register" ? (
           <>

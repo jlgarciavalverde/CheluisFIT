@@ -1,24 +1,22 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert } from "react-native";
-import type {
-  Exercise,
-  ExerciseFacets,
-  ExerciseState,
-  ProgressionSuggestion,
-  ProgressPoint,
-  WorkoutSession,
-} from "../api/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, Keyboard, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { Exercise, ExerciseFacets, ExerciseState } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
+import { showError } from "../utils/errors";
 import { EmptyState } from "../components/EmptyState";
 import { ExerciseFilterBar } from "../components/ExerciseFilterBar";
 import { ExerciseRow } from "../components/ExerciseRow";
 import { LoadingState } from "../components/LoadingState";
-import { Screen } from "../components/Screen";
-import { Section } from "../components/Section";
-import { ExerciseDetailScreen } from "./ExerciseDetailScreen";
+import type { ExercisesStackParamList } from "../navigation/types";
+import { colors } from "../theme/tokens";
 
-export function ExercisesScreen({ setMessage }: { setMessage: (value: string) => void }) {
+type Nav = NativeStackNavigationProp<ExercisesStackParamList, "ExercisesList">;
+
+export function ExercisesScreen() {
   const { apiFetch } = useAuth();
+  const navigation = useNavigation<Nav>();
   const [query, setQuery] = useState("");
   const [targetMuscle, setTargetMuscle] = useState("");
   const [equipment, setEquipment] = useState("");
@@ -26,16 +24,12 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [usedRecentlyOnly, setUsedRecentlyOnly] = useState(false);
   const [inRoutineOnly, setInRoutineOnly] = useState(false);
-  const [metric, setMetric] = useState<"weight" | "volume">("weight");
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [facets, setFacets] = useState<ExerciseFacets | null>(null);
   const [exerciseStates, setExerciseStates] = useState<Map<string, ExerciseState>>(new Map());
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
-  const [selected, setSelected] = useState<Exercise | null>(null);
-  const [progress, setProgress] = useState<ProgressPoint[]>([]);
-  const [progression, setProgression] = useState<ProgressionSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadExerciseStates = useCallback(
     async (ids?: string[]) => {
@@ -59,9 +53,7 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
       if (equipment.trim()) params.set("equipment", equipment.trim().toLowerCase());
       if (bodyPart.trim()) params.set("bodyPart", bodyPart.trim().toLowerCase());
 
-      const result = await apiFetch<{ data: Exercise[] }>(
-        `/exercises?${params.toString()}`,
-      );
+      const result = await apiFetch<{ data: Exercise[] }>(`/exercises?${params.toString()}`);
       setExercises(result.data);
       await loadExerciseStates(result.data.map((exercise) => exercise.id));
     } catch (error) {
@@ -75,164 +67,114 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
     const timer = setTimeout(() => {
       search();
     }, 280);
-
     return () => clearTimeout(timer);
   }, [search]);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<{ data: ExerciseFacets }>("/exercises/facets"),
-      apiFetch<{ data: WorkoutSession[] }>("/me/workout-sessions?limit=50"),
-    ])
-      .then(([facetResult, sessionResult]) => {
-        setFacets(facetResult.data);
-        setSessions(sessionResult.data);
-      })
+    apiFetch<{ data: ExerciseFacets }>("/exercises/facets")
+      .then((result) => setFacets(result.data))
       .catch(() => undefined);
   }, [apiFetch]);
 
-  const openExercise = async (exercise: Exercise) => {
-    setSelected(exercise);
-    const [progressResult, progressionResult] = await Promise.all([
-      apiFetch<{ data: ProgressPoint[] }>(`/exercises/${exercise.id}/progress`),
-      apiFetch<{ data: ProgressionSuggestion }>(`/exercises/${exercise.id}/progression`),
-    ]);
-    setProgress(progressResult.data);
-    setProgression(progressionResult.data);
-  };
-
-  const toggleFavorite = async (exercise = selected) => {
-    if (!exercise) return;
-
-    if (favorites.has(exercise.id)) {
-      await apiFetch(`/favorite-exercises/${exercise.id}`, { method: "DELETE" });
-      const next = new Set(favorites);
-      next.delete(exercise.id);
-      setFavorites(next);
-      setExerciseStates((current) => {
-        const nextStates = new Map(current);
-        const currentState = nextStates.get(exercise.id);
-        if (currentState) nextStates.set(exercise.id, { ...currentState, isFavorite: false });
-        return nextStates;
-      });
-      setMessage("Favorito eliminado");
-    } else {
-      await apiFetch("/favorite-exercises", {
-        method: "POST",
-        body: JSON.stringify({ exerciseId: exercise.id }),
-      });
-      setFavorites(new Set([...favorites, exercise.id]));
-      setExerciseStates((current) => {
-        const nextStates = new Map(current);
-        const currentState = nextStates.get(exercise.id);
-        nextStates.set(exercise.id, {
-          exerciseId: exercise.id,
-          isFavorite: true,
-          usedRecently: currentState?.usedRecently ?? false,
-          inRoutine: currentState?.inRoutine ?? false,
-          lastUsedAt: currentState?.lastUsedAt ?? null,
-          sessionCount: currentState?.sessionCount ?? 0,
-          routineCount: currentState?.routineCount ?? 0,
-        });
-        return nextStates;
-      });
-      setMessage("Favorito guardado");
-    }
-  };
-
-  const visibleExercises = exercises.filter((exercise) => {
-    const state = exerciseStates.get(exercise.id);
-
-    if (favoritesOnly && !favorites.has(exercise.id)) return false;
-    if (usedRecentlyOnly && !state?.usedRecently) return false;
-    if (inRoutineOnly && !state?.inRoutine) return false;
-
-    return true;
-  });
-  const selectedHistory = selected
-    ? sessions.filter((session) =>
-        session.exercises.some((exercise) => exercise.exerciseId === selected.id),
-      )
-    : [];
-
-  return (
-    <Screen>
-      <ExerciseFilterBar
-        facets={facets}
-        query={query}
-        targetMuscle={targetMuscle}
-        equipment={equipment}
-        bodyPart={bodyPart}
-        favoritesOnly={favoritesOnly}
-        usedRecentlyOnly={usedRecentlyOnly}
-        inRoutineOnly={inRoutineOnly}
-        onQueryChange={setQuery}
-        onTargetMuscleChange={setTargetMuscle}
-        onEquipmentChange={setEquipment}
-        onBodyPartChange={setBodyPart}
-        onFavoritesOnlyChange={setFavoritesOnly}
-        onUsedRecentlyOnlyChange={setUsedRecentlyOnly}
-        onInRoutineOnlyChange={setInRoutineOnly}
-        onSearch={search}
-        loading={loading}
-      />
-
-      {selected ? (
-        <ExerciseDetailScreen
-          apiFetch={apiFetch}
-          exercise={selected}
-          favorite={favorites.has(selected.id)}
-          history={selectedHistory}
-          metric={metric}
-          progress={progress}
-          progression={progression}
-          onBack={() => setSelected(null)}
-          onMetricChange={setMetric}
-          onToggleFavorite={() => toggleFavorite(selected).catch(showError)}
-          onAddToActiveWorkout={() => addToActiveWorkout(selected).catch(showError)}
-          setMessage={setMessage}
-        />
-      ) : null}
-
-      <Section title="Resultados">
-        {loading ? (
-          <LoadingState title="Buscando ejercicios" />
-        ) : visibleExercises.length === 0 ? (
-          <EmptyState title="Sin resultados" message="Prueba con otro nombre o musculo." />
-        ) : (
-          visibleExercises.map((exercise) => (
-            <ExerciseRow
-              key={exercise.id}
-              exercise={exercise}
-              badges={buildBadges(exercise.id, exerciseStates, favorites)}
-              selected={selected?.id === exercise.id}
-              onPress={() => openExercise(exercise).catch(showError)}
-            />
-          ))
-        )}
-      </Section>
-    </Screen>
+  const visibleExercises = useMemo(
+    () =>
+      exercises.filter((exercise) => {
+        const state = exerciseStates.get(exercise.id);
+        if (favoritesOnly && !favorites.has(exercise.id)) return false;
+        if (usedRecentlyOnly && !state?.usedRecently) return false;
+        if (inRoutineOnly && !state?.inRoutine) return false;
+        return true;
+      }),
+    [exercises, exerciseStates, favorites, favoritesOnly, usedRecentlyOnly, inRoutineOnly],
   );
 
-  async function addToActiveWorkout(exercise: Exercise) {
-    const active = await apiFetch<{ data: WorkoutSession | null }>("/workout-sessions/active");
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await search();
+    setRefreshing(false);
+  }, [search]);
 
-    if (!active.data) {
-      setMessage("Empieza una rutina antes de anadir ejercicios");
-      return;
-    }
+  const renderItem = useCallback(
+    ({ item }: { item: Exercise }) => (
+      <ExerciseRow
+        exercise={item}
+        badges={buildBadges(item.id, exerciseStates, favorites)}
+        selected={false}
+        onPress={() => navigation.navigate("ExerciseDetail", { exercise: item })}
+      />
+    ),
+    [exerciseStates, favorites, navigation],
+  );
 
-    await apiFetch(`/workout-sessions/${active.data.id}/exercises`, {
-      method: "POST",
-      body: JSON.stringify({
-        exerciseId: exercise.id,
-        sets: [{ weightKg: 0, reps: 10, type: "NORMAL", restSeconds: 90 }],
-      }),
-    });
+  const keyExtractor = useCallback((item: Exercise) => item.id, []);
 
-    setMessage("Ejercicio anadido al entreno");
-    await loadExerciseStates(exercises.map((item) => item.id));
-  }
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.header}>
+        <ExerciseFilterBar
+          facets={facets}
+          query={query}
+          targetMuscle={targetMuscle}
+          equipment={equipment}
+          bodyPart={bodyPart}
+          favoritesOnly={favoritesOnly}
+          usedRecentlyOnly={usedRecentlyOnly}
+          inRoutineOnly={inRoutineOnly}
+          onQueryChange={setQuery}
+          onTargetMuscleChange={setTargetMuscle}
+          onEquipmentChange={setEquipment}
+          onBodyPartChange={setBodyPart}
+          onFavoritesOnlyChange={setFavoritesOnly}
+          onUsedRecentlyOnlyChange={setUsedRecentlyOnly}
+          onInRoutineOnlyChange={setInRoutineOnly}
+          onSearch={search}
+          loading={loading}
+        />
+        <Text style={styles.sectionTitle}>Resultados</Text>
+      </View>
+    ),
+    [
+      facets, query, targetMuscle, equipment, bodyPart,
+      favoritesOnly, usedRecentlyOnly, inRoutineOnly,
+      search, loading,
+    ],
+  );
+
+  const listEmpty = useMemo(
+    () =>
+      loading && !refreshing ? (
+        <LoadingState title="Buscando ejercicios" />
+      ) : (
+        <EmptyState title="Sin resultados" message="Prueba con otro nombre o musculo." />
+      ),
+    [loading, refreshing],
+  );
+
+  return (
+    <FlatList
+      data={visibleExercises}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      ListHeaderComponent={listHeader}
+      ListEmptyComponent={listEmpty}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      onScrollBeginDrag={Keyboard.dismiss}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          tintColor={colors.lime}
+          colors={[colors.lime]}
+        />
+      }
+      ItemSeparatorComponent={Separator}
+    />
+  );
+}
+
+function Separator() {
+  return <View style={styles.separator} />;
 }
 
 function buildBadges(
@@ -241,7 +183,6 @@ function buildBadges(
   favorites: Set<string>,
 ) {
   const state = exerciseStates.get(exerciseId);
-
   return [
     favorites.has(exerciseId) ? "Favorito" : null,
     state?.usedRecently ? "Reciente" : null,
@@ -249,6 +190,26 @@ function buildBadges(
   ].filter((badge): badge is string => Boolean(badge));
 }
 
-function showError(error: unknown) {
-  Alert.alert("Error", error instanceof Error ? error.message : "Algo ha fallado");
-}
+const styles = StyleSheet.create({
+  content: {
+    backgroundColor: colors.background,
+    gap: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 128,
+  },
+  header: {
+    gap: 18,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  separator: {
+    height: 10,
+  },
+});

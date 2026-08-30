@@ -39,9 +39,7 @@ export function Button({
       ]}
     >
       {Icon ? <Icon color={labelColor} size={size === "sm" ? 15 : 17} strokeWidth={2.8} /> : null}
-      <Text style={[styles.label, { color: labelColor }]}>
-        {label}
-      </Text>
+      <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
     </Pressable>
   );
 }

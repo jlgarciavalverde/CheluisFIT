@@ -66,7 +66,10 @@ export function RoutineExerciseBlock({
 
       <View style={styles.sets}>
         {item.sets.map((set) => (
-          <View key={set.clientId} style={[styles.setRow, { borderColor: getSetTypeColor(set.type) }]}>
+          <View
+            key={set.clientId}
+            style={[styles.setRow, { borderColor: getSetTypeColor(set.type) }]}
+          >
             <Text style={[styles.setSummary, { color: getSetTypeColor(set.type) }]}>
               {set.targetWeightKg}x{set.targetReps}
             </Text>

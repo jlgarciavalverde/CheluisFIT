@@ -110,9 +110,9 @@ export async function getDashboard(userId: string) {
 
 function getWeekStart(date: Date) {
   const weekStart = new Date(date);
-  const day = weekStart.getDay();
+  const day = weekStart.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  weekStart.setDate(weekStart.getDate() + diff);
-  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setUTCDate(weekStart.getUTCDate() + diff);
+  weekStart.setUTCHours(0, 0, 0, 0);
   return weekStart;
 }

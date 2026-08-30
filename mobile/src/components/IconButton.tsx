@@ -24,7 +24,11 @@ export function IconButton({
       }}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
-      {Icon ? <Icon color={colors.text} size={18} strokeWidth={2.7} /> : <Text style={styles.symbol}>{symbol}</Text>}
+      {Icon ? (
+        <Icon color={colors.text} size={18} strokeWidth={2.7} />
+      ) : (
+        <Text style={styles.symbol}>{symbol}</Text>
+      )}
     </Pressable>
   );
 }

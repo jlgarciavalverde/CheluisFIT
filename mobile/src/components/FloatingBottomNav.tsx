@@ -1,70 +1,56 @@
 import { ClipboardList, Dumbbell, History, User } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import type { WorkoutSession } from "../api/types";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { useWorkout } from "../contexts/WorkoutContext";
 import { colors, radius, shadow } from "../theme/tokens";
 import { ActiveWorkoutOrb } from "./ActiveWorkoutOrb";
 
-type NavItem = {
-  key: string;
-  label: string;
+const tabMeta: Record<string, { label: string; Icon: typeof History }> = {
+  HistoryTab: { label: "Historial", Icon: History },
+  ExercisesTab: { label: "Ejercicios", Icon: Dumbbell },
+  RoutinesTab: { label: "Rutinas", Icon: ClipboardList },
+  ProfileTab: { label: "Perfil", Icon: User },
 };
 
-const iconMap = {
-  exercises: Dumbbell,
-  history: History,
-  profile: User,
-  routines: ClipboardList,
-} as const;
+export function FloatingBottomNav({ state, navigation }: BottomTabBarProps) {
+  const { activeSession, restLeft, restTotal } = useWorkout();
 
-export function FloatingBottomNav({
-  activeKey,
-  items,
-  session,
-  secondsLeft,
-  totalSeconds,
-  onChange,
-  onCenterPress,
-}: {
-  activeKey: string;
-  items: NavItem[];
-  session: WorkoutSession | null;
-  secondsLeft: number;
-  totalSeconds: number;
-  onChange: (key: string) => void;
-  onCenterPress: () => void;
-}) {
-  const leftItems = items.slice(0, 2);
-  const rightItems = items.slice(2);
+  const visibleRoutes = state.routes.filter((r) => r.name !== "ActiveWorkoutTab");
+  const leftRoutes = visibleRoutes.slice(0, 2);
+  const rightRoutes = visibleRoutes.slice(2);
 
   return (
     <View pointerEvents="box-none" style={styles.overlay}>
       <View style={styles.bar}>
-        <View style={styles.side}>{leftItems.map(renderItem)}</View>
+        <View style={styles.side}>{leftRoutes.map(renderItem)}</View>
         <ActiveWorkoutOrb
-          session={session}
-          secondsLeft={secondsLeft}
-          totalSeconds={totalSeconds}
-          onPress={onCenterPress}
+          session={activeSession}
+          secondsLeft={restLeft}
+          totalSeconds={restTotal}
+          onPress={() => navigation.navigate("ActiveWorkoutTab")}
         />
-        <View style={styles.side}>{rightItems.map(renderItem)}</View>
+        <View style={styles.side}>{rightRoutes.map(renderItem)}</View>
       </View>
     </View>
   );
 
-  function renderItem(item: NavItem) {
-    const active = item.key === activeKey;
-    const Icon = iconMap[item.key as keyof typeof iconMap];
+  function renderItem(route: (typeof state.routes)[number]) {
+    const meta = tabMeta[route.name];
+    if (!meta) return null;
+
+    const routeIndex = state.routes.findIndex((r) => r.key === route.key);
+    const active = state.index === routeIndex;
     const color = active ? colors.lime : colors.muted;
 
     return (
       <Pressable
         accessibilityRole="button"
-        key={item.key}
-        onPress={() => onChange(item.key)}
+        key={route.key}
+        onPress={() => navigation.navigate(route.name)}
         style={[styles.item, active && styles.activeItem]}
       >
-        {Icon ? <Icon color={color} size={18} strokeWidth={2.6} /> : null}
-        <Text style={[styles.itemText, active && styles.activeText]}>{item.label}</Text>
+        <meta.Icon color={color} size={18} strokeWidth={2.6} />
+        <Text style={[styles.itemText, active && styles.activeText]}>{meta.label}</Text>
       </Pressable>
     );
   }

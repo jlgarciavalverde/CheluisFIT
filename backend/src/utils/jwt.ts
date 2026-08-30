@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const TOKEN_TTL = process.env.JWT_TTL ?? "7d";
+const ACCESS_TOKEN_TTL = process.env.JWT_TTL ?? "15m";
+const REFRESH_TOKEN_TTL_DAYS = 7;
 
 type JwtPayload = {
   sub: string;
@@ -8,18 +9,27 @@ type JwtPayload = {
   exp?: number;
 };
 
+export function getRefreshTokenTtlMs() {
+  return REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+}
+
 export async function signJwt(payload: Omit<JwtPayload, "exp">) {
   return new SignJWT({ email: payload.email })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
+    .setIssuer("cheluisfit")
+    .setAudience("cheluisfit-api")
     .setIssuedAt()
-    .setExpirationTime(TOKEN_TTL)
+    .setExpirationTime(ACCESS_TOKEN_TTL)
     .sign(getJwtSecret());
 }
 
 export async function verifyJwt(token: string): Promise<JwtPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getJwtSecret());
+    const { payload } = await jwtVerify(token, getJwtSecret(), {
+      issuer: "cheluisfit",
+      audience: "cheluisfit-api",
+    });
     const email = typeof payload.email === "string" ? payload.email : null;
 
     if (!payload.sub || !email) {

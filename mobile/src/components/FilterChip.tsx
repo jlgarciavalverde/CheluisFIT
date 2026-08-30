@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from "react-native";
-import { colors, radius, spacing } from "../theme/tokens";
+import { colors, radius, spacing, withOpacity } from "../theme/tokens";
 
 export function FilterChip({
   label,
@@ -17,11 +17,7 @@ export function FilterChip({
       accessibilityRole="button"
       accessibilityState={{ selected: Boolean(active) }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        active && styles.active,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.chip, active && styles.active, pressed && styles.pressed]}
     >
       <Text numberOfLines={1} style={[styles.label, active && styles.activeLabel]}>
         {label}
@@ -43,7 +39,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   active: {
-    backgroundColor: `${colors.lime}1A`,
+    backgroundColor: withOpacity(colors.lime, 0.10),
     borderColor: colors.lime,
   },
   pressed: {

@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Copy, Dumbbell, Plus } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { showError } from "../utils/errors";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { WorkoutTemplate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
+import { useToast } from "../contexts/ToastContext";
+import { useWorkout } from "../contexts/WorkoutContext";
 import { BottomSheet } from "../components/BottomSheet";
 import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
@@ -10,21 +15,20 @@ import { RoutineCard } from "../components/RoutineCard";
 import { Screen } from "../components/Screen";
 import { Section } from "../components/Section";
 import { TemplatePickerSheet } from "../components/TemplatePickerSheet";
+import type { RoutinesStackParamList } from "../navigation/types";
 import { colors, radius, shadow } from "../theme/tokens";
-import { RoutineBuilderScreen } from "./RoutineBuilderScreen";
 
-export function RoutinesScreen({
-  onActiveChange,
-  setMessage,
-}: {
-  onActiveChange: () => void;
-  setMessage: (value: string) => void;
-}) {
+type Nav = NativeStackNavigationProp<RoutinesStackParamList, "RoutinesList">;
+
+export function RoutinesScreen() {
   const { apiFetch } = useAuth();
+  const navigation = useNavigation<Nav>();
+  const showToast = useToast();
+  const { loadActiveSession } = useWorkout();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
-  const [builderTemplate, setBuilderTemplate] = useState<WorkoutTemplate | null | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadTemplates = useCallback(() => {
     apiFetch<{ data: WorkoutTemplate[] }>("/workout-templates")
@@ -34,37 +38,69 @@ export function RoutinesScreen({
 
   useEffect(loadTemplates, [loadTemplates]);
 
-  const startTemplate = async (template: WorkoutTemplate) => {
-    await apiFetch(`/workout-templates/${template.id}/start`, { method: "POST" });
-    onActiveChange();
-    setMessage("Entreno iniciado");
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", loadTemplates);
+    return unsubscribe;
+  }, [navigation, loadTemplates]);
+
+  const startTemplate = (template: WorkoutTemplate) => {
+    Alert.alert("Iniciar entreno", `Empezar "${template.name}"?`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Empezar",
+        onPress: () => {
+          apiFetch(`/workout-templates/${template.id}/start`, { method: "POST" })
+            .then(() => {
+              loadActiveSession();
+              showToast("Entreno iniciado");
+            })
+            .catch(showError);
+        },
+      },
+    ]);
   };
 
   const cloneTemplate = async (template: WorkoutTemplate) => {
     await apiFetch(`/workout-templates/${template.id}/clone`, { method: "POST" });
-    setMessage("Rutina clonada");
+    showToast("Rutina clonada");
     loadTemplates();
   };
 
-  if (builderTemplate !== undefined) {
-    return (
-      <RoutineBuilderScreen
-        template={builderTemplate}
-        onCancel={() => setBuilderTemplate(undefined)}
-        onSaved={() => {
-          setBuilderTemplate(undefined);
-          setMessage("Rutina guardada");
-          loadTemplates();
-        }}
-      />
-    );
-  }
+  const deleteTemplate = (template: WorkoutTemplate) => {
+    Alert.alert("Eliminar rutina", `Eliminar "${template.name}"?`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => {
+          apiFetch(`/workout-templates/${template.id}`, { method: "DELETE" })
+            .then(() => {
+              showToast("Rutina eliminada");
+              loadTemplates();
+            })
+            .catch(showError);
+        },
+      },
+    ]);
+  };
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await apiFetch<{ data: WorkoutTemplate[] }>("/workout-templates")
+      .then((result) => setTemplates(result.data))
+      .catch(() => undefined);
+    setRefreshing(false);
+  };
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={refresh}>
       <Section title="Mis rutinas">
         <View style={styles.hero}>
-          <Button icon={Plus} label="Crear desde cero" onPress={() => setBuilderTemplate(null)} />
+          <Button
+            icon={Plus}
+            label="Crear desde cero"
+            onPress={() => navigation.navigate("RoutineBuilder", { template: null })}
+          />
           <Button
             icon={Copy}
             label="Usar plantilla"
@@ -81,9 +117,10 @@ export function RoutinesScreen({
               key={template.id}
               template={template}
               onClone={() => cloneTemplate(template).catch(showError)}
-              onEdit={() => setBuilderTemplate(template)}
+              onDelete={() => deleteTemplate(template)}
+              onEdit={() => navigation.navigate("RoutineBuilder", { template })}
               onOpen={() => setSelectedTemplate(template)}
-              onStart={() => startTemplate(template).catch(showError)}
+              onStart={() => startTemplate(template)}
             />
           ))
         )}
@@ -104,13 +141,16 @@ export function RoutinesScreen({
           <>
             <Text style={styles.sheetTitle}>{selectedTemplate.name}</Text>
             <Text style={styles.sheetMeta}>
-              {selectedTemplate.exercises.length} ejercicios · {countSets(selectedTemplate)} series · {estimateMinutes(selectedTemplate)} min
+              {selectedTemplate.exercises.length} ejercicios · {countSets(selectedTemplate)} series
+              · {estimateMinutes(selectedTemplate)} min
             </Text>
             {selectedTemplate.exercises.slice(0, 6).map((exercise) => (
               <View key={exercise.id} style={styles.previewRow}>
                 <Text style={styles.previewTitle}>{exercise.exercise.name}</Text>
                 <Text style={styles.sheetMeta}>
-                  {exercise.sets.map((set) => `${set.targetWeightKg ?? 0}x${set.targetReps ?? 0}`).join(" · ")}
+                  {exercise.sets
+                    .map((set) => `${set.targetWeightKg ?? 0}x${set.targetReps ?? 0}`)
+                    .join(" · ")}
                 </Text>
               </View>
             ))}
@@ -121,15 +161,16 @@ export function RoutinesScreen({
                 onPress={() => {
                   const template = selectedTemplate;
                   setSelectedTemplate(null);
-                  startTemplate(template).catch(showError);
+                  startTemplate(template);
                 }}
               />
               <Button
                 label="Editar"
                 variant="secondary"
                 onPress={() => {
-                  setBuilderTemplate(selectedTemplate);
+                  const template = selectedTemplate;
                   setSelectedTemplate(null);
+                  navigation.navigate("RoutineBuilder", { template });
                 }}
               />
             </View>
@@ -146,10 +187,6 @@ function countSets(template: WorkoutTemplate) {
 
 function estimateMinutes(template: WorkoutTemplate) {
   return Math.max(Math.round(template.exercises.length * 4 + countSets(template) * 1.5), 20);
-}
-
-function showError(error: unknown) {
-  Alert.alert("Error", error instanceof Error ? error.message : "Algo ha fallado");
 }
 
 const styles = StyleSheet.create({

@@ -3,11 +3,7 @@ import { colors, radius } from "../theme/tokens";
 
 export function TextField(props: TextInputProps) {
   return (
-    <TextInput
-      placeholderTextColor={colors.muted}
-      {...props}
-      style={[styles.input, props.style]}
-    />
+    <TextInput placeholderTextColor={colors.muted} {...props} style={[styles.input, props.style]} />
   );
 }
 

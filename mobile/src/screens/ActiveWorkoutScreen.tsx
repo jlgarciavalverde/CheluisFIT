@@ -1,8 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { CheckCircle2, Plus, TimerOff } from "lucide-react-native";
-import type { Exercise, WorkoutSession, WorkoutSet } from "../api/types";
+import type { Exercise, WorkoutSet } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
+import { showError } from "../utils/errors";
+import {
+  completedSets,
+  formatClock,
+  formatDuration,
+  totalSets,
+  totalVolume,
+} from "../utils/workout";
+import { useToast } from "../contexts/ToastContext";
+import { useWorkout } from "../contexts/WorkoutContext";
 import { ActiveWorkoutExerciseCard } from "../components/ActiveWorkoutExerciseCard";
 import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
@@ -12,30 +22,29 @@ import { SetEditorSheet } from "../components/SetEditorSheet";
 import { StatStrip } from "../components/StatStrip";
 import { WorkoutExercisePicker } from "../components/WorkoutExercisePicker";
 import { WorkoutSummaryPanel } from "../components/WorkoutSummaryPanel";
-import { colors } from "../theme/tokens";
+import { colors, withOpacity } from "../theme/tokens";
 
-export function ActiveWorkoutScreen({
-  session,
-  onActiveChange,
-  restLeft,
-  restTotal,
-  onAdjustRest,
-  onSkipRest,
-  onStartRest,
-  setMessage,
-}: {
-  session: WorkoutSession | null;
-  onActiveChange: () => void;
-  restLeft: number;
-  restTotal: number;
-  onAdjustRest: (seconds: number) => void;
-  onSkipRest: () => void;
-  onStartRest: (seconds: number) => void;
-  setMessage: (value: string) => void;
-}) {
+export function ActiveWorkoutScreen() {
   const { apiFetch } = useAuth();
+  const showToast = useToast();
+  const {
+    activeSession: session,
+    loadActiveSession,
+    restLeft,
+    restTotal,
+    adjustRest,
+    skipRest,
+    startRest,
+  } = useWorkout();
   const [editingSet, setEditingSet] = useState<WorkoutSet | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!session) return;
+    const id = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [session]);
 
   if (!session) {
     return (
@@ -55,19 +64,22 @@ export function ActiveWorkoutScreen({
       method: "PATCH",
       body: JSON.stringify({ completed: true }),
     });
-    onStartRest(restSeconds);
-    onActiveChange();
-    setMessage("Serie completada");
+    startRest(restSeconds);
+    loadActiveSession();
+    showToast("Serie completada");
   };
 
-  const editSet = async (set: WorkoutSet, input: Omit<WorkoutSet, "id" | "setNumber" | "completedAt">) => {
+  const editSet = async (
+    set: WorkoutSet,
+    input: Omit<WorkoutSet, "id" | "setNumber" | "completedAt">,
+  ) => {
     await apiFetch(`/workout-sessions/${session.id}/sets/${set.id}`, {
       method: "PATCH",
       body: JSON.stringify(input),
     });
     setEditingSet(null);
-    onActiveChange();
-    setMessage("Serie actualizada");
+    loadActiveSession();
+    showToast("Serie actualizada");
   };
 
   const addSet = async (workoutExerciseId: string, lastSet?: WorkoutSet) => {
@@ -80,8 +92,8 @@ export function ActiveWorkoutScreen({
         restSeconds: lastSet?.restSeconds ?? 90,
       }),
     });
-    onActiveChange();
-    setMessage("Serie anadida");
+    loadActiveSession();
+    showToast("Serie anadida");
   };
 
   const addExercise = async (exercise: Exercise) => {
@@ -92,23 +104,36 @@ export function ActiveWorkoutScreen({
         sets: [{ weightKg: 0, reps: 10, type: "NORMAL", restSeconds: 90 }],
       }),
     });
-    onActiveChange();
-    setMessage("Ejercicio anadido");
+    loadActiveSession();
+    showToast("Ejercicio anadido");
   };
 
-  const completeWorkout = async () => {
-    await apiFetch(`/workout-sessions/${session.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: "COMPLETED" }),
-    });
-    onActiveChange();
-    setMessage("Entreno completado");
+  const completeWorkout = () => {
+    Alert.alert("Completar entreno", "Se marcara como terminado. Continuar?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Completar",
+        onPress: () => {
+          apiFetch(`/workout-sessions/${session.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "COMPLETED" }),
+          })
+            .then(() => {
+              loadActiveSession();
+              showToast("Entreno completado");
+            })
+            .catch(showError);
+        },
+      },
+    ]);
   };
 
   return (
     <Screen>
       <Section title="Entreno actual">
-        <Text style={styles.meta}>{formatDate(session.startedAt)} · {session.status}</Text>
+        <Text style={styles.meta}>
+          {formatDate(session.startedAt)} · {session.status === "COMPLETED" ? "Completado" : "En progreso"}
+        </Text>
         <StatStrip
           items={[
             { label: "Series", value: `${completedSets(session)}/${totalSets(session)}` },
@@ -122,13 +147,24 @@ export function ActiveWorkoutScreen({
               {restLeft > 0 ? `Descanso ${formatClock(restLeft)}` : "Descanso terminado"}
             </Text>
             <View style={styles.restActions}>
-              <Button label="-15s" size="sm" variant="ghost" onPress={() => onAdjustRest(-15)} />
-              <Button label="+15s" size="sm" variant="ghost" onPress={() => onAdjustRest(15)} />
-              <Button icon={TimerOff} label="Saltar" size="sm" variant="secondary" onPress={onSkipRest} />
+              <Button label="-15s" size="sm" variant="ghost" onPress={() => adjustRest(-15)} />
+              <Button label="+15s" size="sm" variant="ghost" onPress={() => adjustRest(15)} />
+              <Button
+                icon={TimerOff}
+                label="Saltar"
+                size="sm"
+                variant="secondary"
+                onPress={skipRest}
+              />
             </View>
           </View>
         ) : null}
-        <Button icon={Plus} label="Anadir ejercicio" variant="secondary" onPress={() => setPickerOpen(true)} />
+        <Button
+          icon={Plus}
+          label="Anadir ejercicio"
+          variant="secondary"
+          onPress={() => setPickerOpen(true)}
+        />
       </Section>
 
       <WorkoutSummaryPanel summary={session.muscleSummary} />
@@ -140,17 +176,22 @@ export function ActiveWorkoutScreen({
             workoutExercise={exercise}
             nextSetId={nextSetId}
             onAddSet={(workoutExercise) =>
-              addSet(workoutExercise.id, workoutExercise.sets.at(-1)).catch(showError)
+              addSet(
+                workoutExercise.id,
+                workoutExercise.sets[workoutExercise.sets.length - 1],
+              ).catch(showError)
             }
-            onCompleteSet={(setId, restSeconds) =>
-              completeSet(setId, restSeconds).catch(showError)
-            }
+            onCompleteSet={(setId, restSeconds) => completeSet(setId, restSeconds).catch(showError)}
             onEditSet={setEditingSet}
           />
         ))}
       </Section>
 
-      <Button icon={CheckCircle2} label="Completar entreno" onPress={() => completeWorkout().catch(showError)} />
+      <Button
+        icon={CheckCircle2}
+        label="Completar entreno"
+        onPress={completeWorkout}
+      />
 
       <WorkoutExercisePicker
         apiFetch={apiFetch}
@@ -172,52 +213,22 @@ export function ActiveWorkoutScreen({
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString();
+  const d = new Date(value);
+  const day = d.getDate();
+  const month = d.getMonth() + 1;
+  const hours = d.getHours().toString().padStart(2, "0");
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  return `${day}/${month} ${hours}:${minutes}`;
 }
 
-function showError(error: unknown) {
-  Alert.alert("Error", error instanceof Error ? error.message : "Algo ha fallado");
-}
-
-function totalSets(session: WorkoutSession) {
-  return session.exercises.reduce((total, exercise) => total + exercise.sets.length, 0);
-}
-
-function completedSets(session: WorkoutSession) {
-  return session.exercises.reduce(
-    (total, exercise) => total + exercise.sets.filter((set) => set.completedAt).length,
-    0,
-  );
-}
-
-function totalVolume(session: WorkoutSession) {
-  return session.exercises.reduce(
-    (sessionTotal, exercise) =>
-      sessionTotal +
-      exercise.sets.reduce((exerciseTotal, set) => exerciseTotal + set.weightKg * set.reps, 0),
-    0,
-  );
-}
-
-function getNextSetId(session: WorkoutSession) {
+function getNextSetId(session: {
+  exercises: Array<{ sets: Array<{ id: string; completedAt: string | null }> }>;
+}) {
   for (const exercise of session.exercises) {
     const nextSet = exercise.sets.find((set) => !set.completedAt);
     if (nextSet) return nextSet.id;
   }
-
   return null;
-}
-
-function formatClock(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return `${minutes}:${rest.toString().padStart(2, "0")}`;
-}
-
-function formatDuration(startedAt: string) {
-  const diffMs = Math.max(Date.now() - new Date(startedAt).getTime(), 0);
-  const minutes = Math.floor(diffMs / 60000);
-  return `${minutes}m`;
 }
 
 const styles = StyleSheet.create({
@@ -225,12 +236,8 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
   },
-  row: {
-    flexDirection: "row",
-    gap: 8,
-  },
   restPanel: {
-    backgroundColor: `${colors.cyan}12`,
+    backgroundColor: withOpacity(colors.cyan, 0.07),
     borderColor: colors.cyan,
     borderRadius: 14,
     borderWidth: 1,

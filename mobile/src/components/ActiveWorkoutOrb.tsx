@@ -19,7 +19,13 @@ export function ActiveWorkoutOrb({
       .name ?? "Entreno";
   const isResting = totalSeconds > 0 && secondsLeft > 0;
   const restDone = totalSeconds > 0 && secondsLeft === 0;
-  const label = !session ? "Empezar" : restDone ? "Listo" : isResting ? "Descanso" : currentExercise;
+  const label = !session
+    ? "Empezar"
+    : restDone
+      ? "Listo"
+      : isResting
+        ? "Descanso"
+        : currentExercise;
   const badgeStyle = !session
     ? styles.badgeIdle
     : restDone
