@@ -33,27 +33,31 @@ export function Button({ label, onPress, disabled, size = "md", variant = "prima
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: radius.md,
+    borderRadius: 14,
     justifyContent: "center",
   },
   md: {
     minHeight: 46,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
   sm: {
     minHeight: 32,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   primary: {
     backgroundColor: colors.lime,
+    borderColor: colors.lime,
+    borderWidth: 1,
   },
   secondary: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(34, 211, 238, 0.08)",
     borderColor: colors.cyan,
     borderWidth: 1,
   },
   ghost: {
     backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderWidth: 1,
   },
   disabled: {
     opacity: 0.55,

@@ -1,17 +1,32 @@
-import { Platform } from "react-native";
-
 export const defaultApiBase =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === "android"
-    ? "http://10.0.2.2:3000/api"
-    : "http://127.0.0.1:3000/api");
+  process.env.EXPO_PUBLIC_API_URL ?? "https://cheluisfit-api.onrender.com/api";
 
 export async function parseApiResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
+  let body: unknown = null;
+
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      body = text;
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(body?.error ?? "Request failed");
+    const message =
+      (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+        ? body.error
+        : typeof body === "object" && body !== null && "message" in body && typeof body.message === "string"
+          ? body.message
+          : typeof body === "string" && body.trim()
+            ? body
+            : "Request failed");
+    throw new Error(message);
+  }
+
+  if (body === undefined || body === null) {
+    return null as T;
   }
 
   return body as T;

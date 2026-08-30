@@ -74,7 +74,11 @@ function AppShell() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return (
+      <SafeAreaView style={styles.app}>
+        <AuthScreen />
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -154,12 +158,15 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   message: {
-    backgroundColor: colors.surface2,
+    backgroundColor: "rgba(163, 230, 53, 0.10)",
     borderBottomWidth: 1,
-    borderColor: colors.lime,
+    borderColor: "rgba(163, 230, 53, 0.30)",
     borderTopWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   messageText: {
     color: colors.lime,

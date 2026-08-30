@@ -18,7 +18,7 @@ import { ExerciseDetailScreen } from "./ExerciseDetailScreen";
 
 export function ExercisesScreen({ setMessage }: { setMessage: (value: string) => void }) {
   const { apiFetch } = useAuth();
-  const [query, setQuery] = useState("bench");
+  const [query, setQuery] = useState("");
   const [targetMuscle, setTargetMuscle] = useState("");
   const [equipment, setEquipment] = useState("");
   const [bodyPart, setBodyPart] = useState("");
@@ -33,6 +33,14 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
   const [progression, setProgression] = useState<ProgressionSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const clearFilters = () => {
+    setQuery("");
+    setTargetMuscle("");
+    setEquipment("");
+    setBodyPart("");
+    setFavoritesOnly(false);
+  };
+
   const search = useCallback(async () => {
     setLoading(true);
     try {
@@ -42,10 +50,10 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
       if (equipment.trim()) params.set("equipment", equipment.trim().toLowerCase());
       if (bodyPart.trim()) params.set("bodyPart", bodyPart.trim().toLowerCase());
 
-      const result = await apiFetch<{ data: Exercise[] }>(
+      const result = await apiFetch<{ data?: Exercise[] }>(
         `/exercises?${params.toString()}`,
       );
-      setExercises(result.data);
+      setExercises(result?.data ?? []);
     } catch (error) {
       showError(error);
     } finally {
@@ -64,9 +72,9 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
       apiFetch<{ data: WorkoutTemplate[] }>("/workout-templates"),
     ])
       .then(([favoriteResult, sessionResult, templateResult]) => {
-        setFavorites(new Set(favoriteResult.data.map((favorite) => favorite.exercise.id)));
-        setSessions(sessionResult.data);
-        setTemplates(templateResult.data);
+        setFavorites(new Set((favoriteResult.data ?? []).map((favorite) => favorite.exercise.id)));
+        setSessions(sessionResult.data ?? []);
+        setTemplates(templateResult.data ?? []);
       })
       .catch(() => undefined);
   }, [apiFetch]);
@@ -128,6 +136,7 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
         onEquipmentChange={setEquipment}
         onBodyPartChange={setBodyPart}
         onFavoritesOnlyChange={setFavoritesOnly}
+        onResetFilters={clearFilters}
         onSearch={search}
         loading={loading}
       />

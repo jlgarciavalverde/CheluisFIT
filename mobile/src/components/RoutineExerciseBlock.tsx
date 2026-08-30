@@ -52,33 +52,36 @@ export function RoutineExerciseBlock({
           <Text style={styles.kicker}>#{index + 1}</Text>
           <Text style={styles.title}>{item.exercise.name}</Text>
           <Text style={styles.meta}>
-            {item.exercise.targetMuscles.join(", ")} · {item.exercise.equipment.join(", ")}
+            {item.exercise.targetMuscles.join(", ") || "Músculo principal"} · {item.exercise.equipment.join(", ") || "Sin equipo"}
           </Text>
         </View>
+
         <View style={[styles.iconRow, !(canMoveUp || canMoveDown) && styles.iconRowDisabled]}>
-          <IconButton label="Subir ejercicio" symbol="^" onPress={onMoveUp} />
-          <IconButton label="Bajar ejercicio" symbol="v" onPress={onMoveDown} />
+          <IconButton label="Subir ejercicio" symbol="↑" onPress={onMoveUp} />
+          <IconButton label="Bajar ejercicio" symbol="↓" onPress={onMoveDown} />
         </View>
       </View>
 
       <View style={styles.sets}>
-        {item.sets.map((set) => (
+        {item.sets.map((set, setIndex) => (
           <View key={set.clientId} style={[styles.setRow, { borderColor: getSetTypeColor(set.type) }]}>
-            <Text style={[styles.setSummary, { color: getSetTypeColor(set.type) }]}>
-              {set.targetWeightKg}x{set.targetReps}
-            </Text>
+            <Text style={[styles.setSummary, { color: getSetTypeColor(set.type) }]}>Serie {setIndex + 1}</Text>
+            <Text style={styles.setValue}>{set.targetWeightKg} kg × {set.targetReps}</Text>
             <SetTypeChip type={set.type} compact />
             <Text style={styles.rest}>{set.restSeconds}s</Text>
-            <Button label="Editar" variant="ghost" onPress={() => onEditSet(set)} />
-            <Button label="Dup" variant="ghost" onPress={() => onDuplicateSet(set)} />
-            <Button label="Del" variant="ghost" onPress={() => onRemoveSet(set)} />
+
+            <View style={styles.inlineActions}>
+              <Button size="sm" label="Editar" variant="ghost" onPress={() => onEditSet(set)} />
+              <Button size="sm" label="DUP" variant="ghost" onPress={() => onDuplicateSet(set)} />
+              <Button size="sm" label="Borrar" variant="ghost" onPress={() => onRemoveSet(set)} />
+            </View>
           </View>
         ))}
       </View>
 
       <View style={styles.actions}>
-        <Button label="Anadir serie" variant="secondary" onPress={onAddSet} />
-        <Button label="Eliminar ejercicio" variant="ghost" onPress={onRemoveExercise} />
+        <Button label="Añadir serie" variant="secondary" onPress={onAddSet} />
+        <Button label="Quitar ejercicio" variant="ghost" onPress={onRemoveExercise} />
       </View>
     </View>
   );
@@ -137,13 +140,26 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   setSummary: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  setValue: {
+    color: colors.text,
+    fontSize: 13,
     fontWeight: "900",
   },
   rest: {
     color: colors.muted,
     fontSize: 12,
     fontWeight: "800",
+  },
+  inlineActions: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "flex-end",
   },
   actions: {
     flexDirection: "row",

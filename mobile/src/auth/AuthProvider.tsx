@@ -36,11 +36,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         SecureStore.getItemAsync(USER_KEY),
       ]);
 
-      if (!cancelled) {
-        setToken(storedToken);
-        setUserState(storedUser ? (JSON.parse(storedUser) as AuthUser) : null);
-        setBooting(false);
+      if (cancelled) return;
+
+      let nextUser: AuthUser | null = null;
+
+      if (storedUser) {
+        try {
+          nextUser = JSON.parse(storedUser) as AuthUser;
+        } catch {
+          await Promise.all([
+            SecureStore.deleteItemAsync(TOKEN_KEY),
+            SecureStore.deleteItemAsync(USER_KEY),
+          ]);
+        }
       }
+
+      setToken(storedToken);
+      setUserState(nextUser);
+      setBooting(false);
     }
 
     restoreSession().catch(() => {
@@ -65,16 +78,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const apiFetch = useCallback<ApiFetch>(
     async (path, options = {}) => {
-      const response = await fetch(`${apiBase}${path}`, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...options.headers,
-        },
-      });
+      try {
+        const hasBody = typeof options.body !== "undefined";
 
-      return parseApiResponse(response);
+        const response = await fetch(`${apiBase}${path}`, {
+          ...options,
+          headers: {
+            ...(hasBody ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...options.headers,
+          },
+        });
+
+        return parseApiResponse(response);
+      } catch (error) {
+        if (error instanceof Error && error.message.toLowerCase().includes("cancelled")) {
+          throw new Error("La conexión se canceló. Comprueba tu red y vuelve a intentarlo.");
+        }
+
+        if (error instanceof Error) {
+          throw error;
+        }
+
+        throw new Error("No se pudo completar la solicitud.");
+      }
     },
     [apiBase, token],
   );
