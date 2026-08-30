@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci && npm run db:generate && npm run build
+    buildCommand: npm ci && npm run db:generate && npx prisma migrate resolve --applied 0001_initial && npx prisma migrate deploy && npm run build
     startCommand: npm run start
     healthCheckPath: /api/health
     autoDeploy: true
