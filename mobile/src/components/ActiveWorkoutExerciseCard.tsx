@@ -1,3 +1,4 @@
+import { Check, Plus } from "lucide-react-native";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import type { WorkoutSession } from "../api/types";
 import { colors, radius } from "../theme/tokens";
@@ -8,11 +9,13 @@ type WorkoutExercise = WorkoutSession["exercises"][number];
 
 export function ActiveWorkoutExerciseCard({
   workoutExercise,
+  nextSetId,
   onAddSet,
   onCompleteSet,
   onEditSet,
 }: {
   workoutExercise: WorkoutExercise;
+  nextSetId: string | null;
   onAddSet: (workoutExercise: WorkoutExercise) => void;
   onCompleteSet: (setId: string, restSeconds: number) => void;
   onEditSet: (set: WorkoutExercise["sets"][number]) => void;
@@ -31,7 +34,14 @@ export function ActiveWorkoutExerciseCard({
         {workoutExercise.sets.map((set) => {
           const done = Boolean(set.completedAt);
           return (
-            <View key={set.id} style={[styles.setPill, { borderColor: getSetTypeColor(set.type) }]}>
+            <View
+              key={set.id}
+              style={[
+                styles.setPill,
+                { borderColor: getSetTypeColor(set.type) },
+                nextSetId === set.id && styles.nextSet,
+              ]}
+            >
               <Pressable
                 accessibilityRole="button"
                 onPress={() => onEditSet(set)}
@@ -43,16 +53,18 @@ export function ActiveWorkoutExerciseCard({
                 <SetTypeChip type={set.type} compact />
               </Pressable>
               <Button
+                icon={Check}
                 label={done ? "OK" : "Hecha"}
                 size="sm"
-                variant="ghost"
+                variant={nextSetId === set.id ? "primary" : "ghost"}
+                disabled={done}
                 onPress={() => onCompleteSet(set.id, set.restSeconds)}
               />
             </View>
           );
         })}
       </View>
-      <Button label="Anadir serie" variant="secondary" onPress={() => onAddSet(workoutExercise)} />
+      <Button icon={Plus} label="Anadir serie" variant="secondary" onPress={() => onAddSet(workoutExercise)} />
     </View>
   );
 }
@@ -110,6 +122,9 @@ const styles = StyleSheet.create({
   },
   done: {
     opacity: 0.55,
+  },
+  nextSet: {
+    backgroundColor: `${colors.lime}12`,
   },
   setSummary: {
     fontSize: 13,

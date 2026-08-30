@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import type { AuthUser, BodyMeasurement } from "../api/types";
+import type { AuthUser, BodyMeasurement, TrainingGoal, TrainingPreference } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { Button } from "../components/Button";
 import { MetricTile } from "../components/MetricTile";
 import { ProgressChart } from "../components/ProgressChart";
 import { Screen } from "../components/Screen";
 import { Section } from "../components/Section";
+import { SegmentedTabs } from "../components/SegmentedTabs";
 import { TextField } from "../components/TextField";
-import { colors, radius } from "../theme/tokens";
+import { colors, radius, shadow } from "../theme/tokens";
 
 export function ProfileScreen({ setMessage }: { setMessage: (value: string) => void }) {
   const { apiFetch, setUser, user } = useAuth();
@@ -21,7 +22,7 @@ export function ProfileScreen({ setMessage }: { setMessage: (value: string) => v
   const [measurements, setMeasurements] = useState<BodyMeasurement[]>([]);
   const [defaultRest, setDefaultRest] = useState("90");
   const [weeklyFrequency, setWeeklyFrequency] = useState("4");
-  const [goal, setGoal] = useState("Hipertrofia");
+  const [goal, setGoal] = useState<TrainingGoal>("HYPERTROPHY");
 
   useEffect(() => {
     if (!user) return;
@@ -35,8 +36,16 @@ export function ProfileScreen({ setMessage }: { setMessage: (value: string) => v
   }, [user]);
 
   useEffect(() => {
-    apiFetch<{ data: BodyMeasurement[] }>("/me/body-measurements")
-      .then((result) => setMeasurements(result.data))
+    Promise.all([
+      apiFetch<{ data: BodyMeasurement[] }>("/me/body-measurements"),
+      apiFetch<{ data: TrainingPreference }>("/me/preferences"),
+    ])
+      .then(([measurementResult, preferenceResult]) => {
+        setMeasurements(measurementResult.data);
+        setDefaultRest(String(preferenceResult.data.defaultRestSeconds));
+        setWeeklyFrequency(String(preferenceResult.data.weeklyFrequency));
+        setGoal(preferenceResult.data.goal);
+      })
       .catch(() => undefined);
   }, [apiFetch]);
 
@@ -80,87 +89,95 @@ export function ProfileScreen({ setMessage }: { setMessage: (value: string) => v
     setMessage("Medicion guardada");
   };
 
+  const savePreferences = async () => {
+    const result = await apiFetch<{ data: TrainingPreference }>("/me/preferences", {
+      method: "PATCH",
+      body: JSON.stringify({
+        defaultRestSeconds: Number(defaultRest),
+        weeklyFrequency: Number(weeklyFrequency),
+        goal,
+        units: "METRIC",
+      }),
+    });
+    setDefaultRest(String(result.data.defaultRestSeconds));
+    setWeeklyFrequency(String(result.data.weeklyFrequency));
+    setGoal(result.data.goal);
+    setMessage("Preferencias guardadas");
+  };
+
+  const latestMeasurement = measurements.at(-1)?.weightKg ?? user.currentWeightKg;
+  const weightDelta = latestMeasurement - (measurements.at(-2)?.weightKg ?? latestMeasurement);
+
   return (
     <Screen>
       <Section title="Perfil">
-        <Text style={styles.name}>
-          {user.firstName} {user.lastName1}
-        </Text>
-        <Text style={styles.meta}>{user.email}</Text>
-        <View style={styles.metricGrid}>
-          <MetricTile label="Peso" value={`${user.currentWeightKg} kg`} />
-          <MetricTile label="Altura" value={`${user.currentHeightCm} cm`} />
+        <View style={styles.profileCard}>
+          <Text style={styles.name}>
+            {user.firstName} {user.lastName1}
+          </Text>
+          <Text style={styles.meta}>{user.email}</Text>
+          <View style={styles.metricGrid}>
+            <MetricTile label="Peso" value={`${user.currentWeightKg} kg`} />
+            <MetricTile label="Altura" value={`${user.currentHeightCm} cm`} />
+          </View>
         </View>
       </Section>
 
       <Section title="Datos personales">
-        <TextField placeholder="Nombre" value={firstName} onChangeText={setFirstName} />
-        <View style={styles.row}>
-          <TextField
-            placeholder="Primer apellido"
-            value={lastName1}
-            onChangeText={setLastName1}
-            style={styles.flex}
-          />
-          <TextField
-            placeholder="Segundo apellido"
-            value={lastName2 ?? ""}
-            onChangeText={setLastName2}
-            style={styles.flex}
-          />
+        <View style={styles.panel}>
+          <TextField placeholder="Nombre" value={firstName} onChangeText={setFirstName} />
+          <View style={styles.row}>
+            <TextField placeholder="Primer apellido" value={lastName1} onChangeText={setLastName1} style={styles.flex} />
+            <TextField placeholder="Segundo apellido" value={lastName2 ?? ""} onChangeText={setLastName2} style={styles.flex} />
+          </View>
+          <TextField placeholder="Fecha nacimiento YYYY-MM-DD" value={birthDate} onChangeText={setBirthDate} />
+          <View style={styles.row}>
+            <TextField placeholder="Peso kg" keyboardType="numeric" value={weightKg} onChangeText={setWeightKg} style={styles.flex} />
+            <TextField placeholder="Altura cm" keyboardType="numeric" value={heightCm} onChangeText={setHeightCm} style={styles.flex} />
+          </View>
+          <Button label="Guardar perfil" onPress={() => saveProfile().catch(showError)} />
         </View>
-        <TextField placeholder="Fecha nacimiento YYYY-MM-DD" value={birthDate} onChangeText={setBirthDate} />
-        <View style={styles.row}>
-          <TextField
-            placeholder="Peso kg"
-            keyboardType="numeric"
-            value={weightKg}
-            onChangeText={setWeightKg}
-            style={styles.flex}
-          />
-          <TextField
-            placeholder="Altura cm"
-            keyboardType="numeric"
-            value={heightCm}
-            onChangeText={setHeightCm}
-            style={styles.flex}
-          />
-        </View>
-        <Button label="Guardar perfil" onPress={() => saveProfile().catch(showError)} />
       </Section>
 
-      <Section title="Nueva medicion">
-        <Button label="Guardar medicion" onPress={() => saveMeasurement().catch(showError)} />
+      <Section title="Medicion rapida">
+        <View style={styles.panel}>
+          <Button label="Guardar medicion" onPress={() => saveMeasurement().catch(showError)} />
+        </View>
       </Section>
 
       <Section title="Evolucion corporal">
-        <ProgressChart values={measurements.map((measurement) => measurement.weightKg)} />
-        <Text style={styles.meta}>
-          {measurements.length} mediciones guardadas · ultimo{" "}
-          {measurements.at(-1)?.weightKg ?? user.currentWeightKg} kg
-        </Text>
+          <View style={styles.panel}>
+          <ProgressChart
+            values={measurements.map((measurement) => measurement.weightKg)}
+            labels={measurements.map((measurement) =>
+              new Date(measurement.measuredAt).toLocaleDateString(),
+            )}
+          />
+          <View style={styles.inlineSummary}>
+            <Text style={styles.meta}>{measurements.length} mediciones guardadas</Text>
+            <Text style={styles.deltaText}>{weightDelta >= 0 ? "+" : ""}{weightDelta.toFixed(1)} kg</Text>
+          </View>
+          <Text style={styles.meta}>Ultimo registro: {latestMeasurement.toFixed(1)} kg</Text>
+        </View>
       </Section>
 
       <Section title="Preferencias">
-        <View style={styles.preferenceCard}>
-          <TextField placeholder="Objetivo" value={goal} onChangeText={setGoal} />
+        <View style={styles.panel}>
+          <SegmentedTabs
+            tabs={[
+              { key: "HYPERTROPHY", label: "Hipertrofia" },
+              { key: "STRENGTH", label: "Fuerza" },
+              { key: "FAT_LOSS", label: "Definicion" },
+            ]}
+            value={goal}
+            onChange={(key) => setGoal(key as TrainingGoal)}
+          />
           <View style={styles.row}>
-            <TextField
-              placeholder="Descanso defecto"
-              keyboardType="numeric"
-              value={defaultRest}
-              onChangeText={setDefaultRest}
-              style={styles.flex}
-            />
-            <TextField
-              placeholder="Frecuencia semanal"
-              keyboardType="numeric"
-              value={weeklyFrequency}
-              onChangeText={setWeeklyFrequency}
-              style={styles.flex}
-            />
+            <TextField placeholder="Descanso defecto" keyboardType="numeric" value={defaultRest} onChangeText={setDefaultRest} style={styles.flex} />
+            <TextField placeholder="Frecuencia semanal" keyboardType="numeric" value={weeklyFrequency} onChangeText={setWeeklyFrequency} style={styles.flex} />
           </View>
           <Text style={styles.meta}>kg/cm · frecuencia 2 preparada para volumen por musculo.</Text>
+          <Button label="Guardar preferencias" onPress={() => savePreferences().catch(showError)} />
         </View>
       </Section>
     </Screen>
@@ -177,9 +194,27 @@ function showError(error: unknown) {
 }
 
 const styles = StyleSheet.create({
+  profileCard: {
+    backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+    ...shadow.card,
+  },
   metricGrid: {
     flexDirection: "row",
     gap: 10,
+  },
+  panel: {
+    backgroundColor: colors.surface2,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+    ...shadow.card,
   },
   row: {
     flexDirection: "row",
@@ -196,13 +231,16 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.muted,
     fontSize: 13,
+    fontWeight: "600",
   },
-  preferenceCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12,
+  inlineSummary: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  deltaText: {
+    color: colors.lime,
+    fontSize: 14,
+    fontWeight: "900",
   },
 });

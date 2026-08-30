@@ -24,19 +24,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   item: {
     flex: 1,
+    justifyContent: "center",
   },
   value: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900",
+    letterSpacing: 0,
   },
   label: {
     color: colors.muted,
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.4,
     marginTop: 3,
+    textTransform: "uppercase",
   },
 });

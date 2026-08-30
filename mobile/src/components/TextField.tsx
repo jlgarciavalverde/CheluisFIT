@@ -13,12 +13,13 @@ export function TextField(props: TextInputProps) {
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface2,
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
     color: colors.text,
-    minHeight: 46,
+    minHeight: 48,
     paddingHorizontal: 12,
+    paddingVertical: 10,
   },
 });

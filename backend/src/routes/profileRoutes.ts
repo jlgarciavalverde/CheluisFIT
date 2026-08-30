@@ -1,10 +1,14 @@
 import { Router } from "express";
+import { MeasurementUnits, TrainingGoal } from "@prisma/client";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/authMiddleware";
+import { getExerciseStates } from "../services/exerciseService";
 import {
   addBodyMeasurement,
   getProfile,
+  getTrainingPreference,
   listBodyMeasurements,
+  updateTrainingPreference,
   updateProfile,
 } from "../services/profileService";
 import { listWorkoutSessions } from "../services/workoutService";
@@ -25,6 +29,13 @@ const bodyMeasurementSchema = z.object({
   weightKg: z.number().positive(),
   heightCm: z.number().int().positive(),
   measuredAt: z.coerce.date().optional(),
+});
+
+const trainingPreferenceSchema = z.object({
+  defaultRestSeconds: z.number().int().min(0).max(600).optional(),
+  weeklyFrequency: z.number().int().min(1).max(14).optional(),
+  goal: z.nativeEnum(TrainingGoal).optional(),
+  units: z.nativeEnum(MeasurementUnits).optional(),
 });
 
 profileRoutes.use(requireAuth);
@@ -73,6 +84,41 @@ profileRoutes.post("/body-measurements", async (req, res, next) => {
   }
 });
 
+profileRoutes.get("/preferences", async (req, res, next) => {
+  try {
+    const preferences = await getTrainingPreference(getAuthUser(req).id);
+    res.json(preferences);
+  } catch (error) {
+    next(error);
+  }
+});
+
+profileRoutes.patch("/preferences", async (req, res, next) => {
+  try {
+    const preferences = await updateTrainingPreference(
+      getAuthUser(req).id,
+      trainingPreferenceSchema.parse(req.body),
+    );
+
+    res.json(preferences);
+  } catch (error) {
+    next(error);
+  }
+});
+
+profileRoutes.get("/exercise-states", async (req, res, next) => {
+  try {
+    const exerciseIds = asString(req.query.exerciseIds)
+      ?.split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const states = await getExerciseStates(getAuthUser(req).id, exerciseIds);
+    res.json(states);
+  } catch (error) {
+    next(error);
+  }
+});
+
 profileRoutes.get("/workout-sessions", async (req, res, next) => {
   try {
     const sessions = await listWorkoutSessions({
@@ -94,4 +140,8 @@ function asNumber(value: unknown) {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }

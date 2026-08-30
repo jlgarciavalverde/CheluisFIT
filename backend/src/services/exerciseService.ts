@@ -65,6 +65,16 @@ type ListLocalExercisesParams = {
   offset?: number;
 };
 
+type ExerciseState = {
+  exerciseId: string;
+  isFavorite: boolean;
+  usedRecently: boolean;
+  inRoutine: boolean;
+  lastUsedAt: string | null;
+  sessionCount: number;
+  routineCount: number;
+};
+
 let externalCache:
   | Map<
       string,
@@ -162,6 +172,113 @@ export async function listLocalExercises(params: ListLocalExercisesParams) {
     limit,
     offset,
     data: exercises.map(normalizeLocalExercise),
+  };
+}
+
+export async function getExerciseFacets() {
+  const exercises = await prisma.exercise.findMany({
+    select: {
+      targetMuscles: true,
+      secondaryMuscles: true,
+      bodyParts: true,
+      equipment: true,
+    },
+  });
+
+  return {
+    data: {
+      targetMuscles: countFacetValues(exercises.flatMap((exercise) => exercise.targetMuscles)),
+      secondaryMuscles: countFacetValues(
+        exercises.flatMap((exercise) => exercise.secondaryMuscles),
+      ),
+      bodyParts: countFacetValues(exercises.flatMap((exercise) => exercise.bodyParts)),
+      equipment: countFacetValues(exercises.flatMap((exercise) => exercise.equipment)),
+    },
+  };
+}
+
+export async function getExerciseStates(userId: string, exerciseIds?: string[]) {
+  const requestedIds = new Set(exerciseIds?.filter(Boolean) ?? []);
+  const exerciseFilter =
+    requestedIds.size > 0 ? { exerciseId: { in: [...requestedIds] } } : {};
+
+  const [favorites, workoutExercises, templateExercises] = await prisma.$transaction([
+    prisma.favoriteExercise.findMany({
+      where: { userId, ...exerciseFilter },
+      select: { exerciseId: true },
+    }),
+    prisma.workoutExercise.findMany({
+      where: {
+        ...exerciseFilter,
+        workoutSession: { userId },
+      },
+      select: {
+        exerciseId: true,
+        workoutSession: {
+          select: {
+            performedAt: true,
+          },
+        },
+      },
+      orderBy: { workoutSession: { performedAt: "desc" } },
+    }),
+    prisma.workoutTemplateExercise.findMany({
+      where: {
+        ...exerciseFilter,
+        workoutTemplate: { userId },
+      },
+      select: { exerciseId: true },
+    }),
+  ]);
+
+  const states = new Map<string, ExerciseState>();
+  const ensureState = (exerciseId: string) => {
+    const existing = states.get(exerciseId);
+    if (existing) return existing;
+
+    const state = {
+      exerciseId,
+      isFavorite: false,
+      usedRecently: false,
+      inRoutine: false,
+      lastUsedAt: null,
+      sessionCount: 0,
+      routineCount: 0,
+    };
+    states.set(exerciseId, state);
+    return state;
+  };
+
+  for (const exerciseId of requestedIds) {
+    ensureState(exerciseId);
+  }
+
+  for (const favorite of favorites) {
+    ensureState(favorite.exerciseId).isFavorite = true;
+  }
+
+  const recentThreshold = new Date();
+  recentThreshold.setDate(recentThreshold.getDate() - 45);
+
+  for (const workoutExercise of workoutExercises) {
+    const state = ensureState(workoutExercise.exerciseId);
+    const performedAt = workoutExercise.workoutSession.performedAt;
+    state.sessionCount += 1;
+    state.usedRecently ||= performedAt >= recentThreshold;
+
+    if (!state.lastUsedAt || performedAt > new Date(state.lastUsedAt)) {
+      state.lastUsedAt = performedAt.toISOString();
+    }
+  }
+
+  for (const templateExercise of templateExercises) {
+    const state = ensureState(templateExercise.exerciseId);
+    state.inRoutine = true;
+    state.routineCount += 1;
+  }
+
+  return {
+    data: [...states.values()].sort((a, b) => a.exerciseId.localeCompare(b.exerciseId)),
   };
 }
 
@@ -271,6 +388,20 @@ function normalizeExternalExercise(item: ExternalExerciseItem): NormalizedExerci
     instructions,
     tips: instructions,
   };
+}
+
+function countFacetValues(values: string[]) {
+  const counts = new Map<string, number>();
+
+  for (const rawValue of values) {
+    const value = rawValue.trim().toLowerCase();
+    if (!value) continue;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
 
 function clamp(value: number, min: number, max: number) {

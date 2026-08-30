@@ -1,18 +1,19 @@
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView, StyleSheet } from "react-native";
 import type { WorkoutSession } from "./src/api/types";
 import { AuthProvider, useAuth } from "./src/auth/AuthProvider";
-import { Button } from "./src/components/Button";
 import { EmptyState } from "./src/components/EmptyState";
 import { FloatingBottomNav } from "./src/components/FloatingBottomNav";
+import { Toast } from "./src/components/Toast";
+import { TopHeader } from "./src/components/TopHeader";
 import { ActiveWorkoutScreen } from "./src/screens/ActiveWorkoutScreen";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { ExercisesScreen } from "./src/screens/ExercisesScreen";
 import { HistoryScreen } from "./src/screens/HistoryScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RoutinesScreen } from "./src/screens/RoutinesScreen";
-import { colors, typography } from "./src/theme/tokens";
+import { colors } from "./src/theme/tokens";
 
 type AppTab = "history" | "exercises" | "routines" | "profile" | "activeWorkout";
 
@@ -65,6 +66,15 @@ function AppShell() {
     setRestLeft(seconds);
   };
 
+  const adjustRest = (seconds: number) => {
+    setRestLeft((current) => Math.max(current + seconds, 0));
+    setRestTotal((current) => Math.max(current + seconds, restLeft + seconds, 0));
+  };
+
+  const skipRest = () => {
+    setRestLeft(0);
+  };
+
   if (booting) {
     return (
       <SafeAreaView style={styles.app}>
@@ -79,21 +89,8 @@ function AppShell() {
 
   return (
     <SafeAreaView style={styles.app}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>CheluisFIT</Text>
-          <Text numberOfLines={1} style={styles.title}>
-            {tab === "activeWorkout" ? "Entreno actual" : `Hola, ${user.firstName}`}
-          </Text>
-        </View>
-        <Button label="Salir" variant="ghost" onPress={() => logout()} />
-      </View>
-
-      {message ? (
-        <View style={styles.message}>
-          <Text style={styles.messageText}>{message}</Text>
-        </View>
-      ) : null}
+      <TopHeader title={getTabTitle(tab)} onLogout={() => logout()} />
+      <Toast message={message} onDone={() => setMessage("")} />
 
       {tab === "history" ? <HistoryScreen /> : null}
       {tab === "exercises" ? <ExercisesScreen setMessage={setMessage} /> : null}
@@ -105,6 +102,10 @@ function AppShell() {
         <ActiveWorkoutScreen
           session={activeSession}
           onActiveChange={loadActiveSession}
+          restLeft={restLeft}
+          restTotal={restTotal}
+          onAdjustRest={adjustRest}
+          onSkipRest={skipRest}
           onStartRest={startRest}
           setMessage={setMessage}
         />
@@ -123,47 +124,21 @@ function AppShell() {
   );
 }
 
+function getTabTitle(tab: AppTab) {
+  const titles: Record<AppTab, string> = {
+    activeWorkout: "Entreno actual",
+    exercises: "Ejercicios",
+    history: "Resumen",
+    profile: "Perfil",
+    routines: "Rutinas",
+  };
+
+  return titles[tab];
+}
+
 const styles = StyleSheet.create({
   app: {
     backgroundColor: colors.background,
     flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    backgroundColor: colors.background,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-  headerCopy: {
-    flex: 1,
-    marginRight: 12,
-  },
-  eyebrow: {
-    color: colors.lime,
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: colors.text,
-    fontSize: typography.title,
-    fontWeight: "900",
-  },
-  message: {
-    backgroundColor: colors.surface2,
-    borderBottomWidth: 1,
-    borderColor: colors.lime,
-    borderTopWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  messageText: {
-    color: colors.lime,
-    fontSize: 13,
-    fontWeight: "800",
   },
 });

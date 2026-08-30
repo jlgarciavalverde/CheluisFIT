@@ -28,23 +28,47 @@ enum WorkoutSessionStatus {
   COMPLETED
 }
 
+enum TrainingGoal {
+  HYPERTROPHY
+  STRENGTH
+  FAT_LOSS
+  GENERAL_FITNESS
+}
+
+enum MeasurementUnits {
+  METRIC
+}
+
 model User {
-  id                String             @id @default(cuid())
-  firstName         String
-  lastName1         String
-  lastName2         String?
-  birthDate         DateTime
-  currentWeightKg   Float
-  currentHeightCm   Int
-  email             String             @unique
-  passwordHash      String
-  role              Role               @default(USER)
-  measurements      BodyMeasurement[]
-  workoutSessions   WorkoutSession[]
-  workoutTemplates  WorkoutTemplate[]
-  favoriteExercises FavoriteExercise[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                 String                  @id @default(cuid())
+  firstName          String
+  lastName1          String
+  lastName2          String?
+  birthDate          DateTime
+  currentWeightKg    Float
+  currentHeightCm    Int
+  email              String                  @unique
+  passwordHash       String
+  role               Role                    @default(USER)
+  measurements       BodyMeasurement[]
+  workoutSessions    WorkoutSession[]
+  workoutTemplates   WorkoutTemplate[]
+  favoriteExercises  FavoriteExercise[]
+  trainingPreference UserTrainingPreference?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+}
+
+model UserTrainingPreference {
+  id                 String           @id @default(cuid())
+  userId             String           @unique
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultRestSeconds Int              @default(90)
+  weeklyFrequency    Int              @default(4)
+  goal               TrainingGoal     @default(HYPERTROPHY)
+  units              MeasurementUnits @default(METRIC)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 }
 
 model BodyMeasurement {

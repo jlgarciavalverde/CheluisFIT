@@ -4,22 +4,23 @@
   "main": "index.ts",
   "dependencies": {
     "expo": "~57.0.18",
+    "expo-haptics": "~57.0.2",
     "expo-secure-store": "~57.0.2",
     "expo-status-bar": "~57.0.1",
-    "nativewind": "^4.2.6",
+    "lucide-react-native": "^1.37.0",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-svg": "15.15.4"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "expo-doctor": "^1.20.4",
-    "tailwindcss": "^3.3.2",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "doctor": "expo-doctor",

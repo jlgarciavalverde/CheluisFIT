@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert } from "react-native";
 import type {
   Exercise,
+  ExerciseFacets,
+  ExerciseState,
   ProgressionSuggestion,
   ProgressPoint,
   WorkoutSession,
-  WorkoutTemplate,
 } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { EmptyState } from "../components/EmptyState";
@@ -18,25 +19,41 @@ import { ExerciseDetailScreen } from "./ExerciseDetailScreen";
 
 export function ExercisesScreen({ setMessage }: { setMessage: (value: string) => void }) {
   const { apiFetch } = useAuth();
-  const [query, setQuery] = useState("bench");
+  const [query, setQuery] = useState("");
   const [targetMuscle, setTargetMuscle] = useState("");
   const [equipment, setEquipment] = useState("");
   const [bodyPart, setBodyPart] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [usedRecentlyOnly, setUsedRecentlyOnly] = useState(false);
+  const [inRoutineOnly, setInRoutineOnly] = useState(false);
   const [metric, setMetric] = useState<"weight" | "volume">("weight");
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [facets, setFacets] = useState<ExerciseFacets | null>(null);
+  const [exerciseStates, setExerciseStates] = useState<Map<string, ExerciseState>>(new Map());
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [selected, setSelected] = useState<Exercise | null>(null);
   const [progress, setProgress] = useState<ProgressPoint[]>([]);
   const [progression, setProgression] = useState<ProgressionSuggestion | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const loadExerciseStates = useCallback(
+    async (ids?: string[]) => {
+      const suffix = ids?.length ? `?exerciseIds=${ids.join(",")}` : "";
+      const result = await apiFetch<{ data: ExerciseState[] }>(`/me/exercise-states${suffix}`);
+      const nextStates = new Map(result.data.map((state) => [state.exerciseId, state]));
+      setExerciseStates(nextStates);
+      setFavorites(
+        new Set(result.data.filter((state) => state.isFavorite).map((state) => state.exerciseId)),
+      );
+    },
+    [apiFetch],
+  );
+
   const search = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "50" });
+      const params = new URLSearchParams({ limit: "100" });
       if (query.trim()) params.set("q", query.trim());
       if (targetMuscle.trim()) params.set("targetMuscle", targetMuscle.trim().toLowerCase());
       if (equipment.trim()) params.set("equipment", equipment.trim().toLowerCase());
@@ -46,27 +63,30 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
         `/exercises?${params.toString()}`,
       );
       setExercises(result.data);
+      await loadExerciseStates(result.data.map((exercise) => exercise.id));
     } catch (error) {
       showError(error);
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, bodyPart, equipment, query, targetMuscle]);
+  }, [apiFetch, bodyPart, equipment, loadExerciseStates, query, targetMuscle]);
 
   useEffect(() => {
-    search();
-  }, [apiFetch, search]);
+    const timer = setTimeout(() => {
+      search();
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     Promise.all([
-      apiFetch<{ data: Array<{ exercise: Exercise }> }>("/favorite-exercises"),
+      apiFetch<{ data: ExerciseFacets }>("/exercises/facets"),
       apiFetch<{ data: WorkoutSession[] }>("/me/workout-sessions?limit=50"),
-      apiFetch<{ data: WorkoutTemplate[] }>("/workout-templates"),
     ])
-      .then(([favoriteResult, sessionResult, templateResult]) => {
-        setFavorites(new Set(favoriteResult.data.map((favorite) => favorite.exercise.id)));
+      .then(([facetResult, sessionResult]) => {
+        setFacets(facetResult.data);
         setSessions(sessionResult.data);
-        setTemplates(templateResult.data);
       })
       .catch(() => undefined);
   }, [apiFetch]);
@@ -89,6 +109,12 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
       const next = new Set(favorites);
       next.delete(exercise.id);
       setFavorites(next);
+      setExerciseStates((current) => {
+        const nextStates = new Map(current);
+        const currentState = nextStates.get(exercise.id);
+        if (currentState) nextStates.set(exercise.id, { ...currentState, isFavorite: false });
+        return nextStates;
+      });
       setMessage("Favorito eliminado");
     } else {
       await apiFetch("/favorite-exercises", {
@@ -96,19 +122,33 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
         body: JSON.stringify({ exerciseId: exercise.id }),
       });
       setFavorites(new Set([...favorites, exercise.id]));
+      setExerciseStates((current) => {
+        const nextStates = new Map(current);
+        const currentState = nextStates.get(exercise.id);
+        nextStates.set(exercise.id, {
+          exerciseId: exercise.id,
+          isFavorite: true,
+          usedRecently: currentState?.usedRecently ?? false,
+          inRoutine: currentState?.inRoutine ?? false,
+          lastUsedAt: currentState?.lastUsedAt ?? null,
+          sessionCount: currentState?.sessionCount ?? 0,
+          routineCount: currentState?.routineCount ?? 0,
+        });
+        return nextStates;
+      });
       setMessage("Favorito guardado");
     }
   };
 
-  const usedExerciseIds = new Set(
-    sessions.flatMap((session) => session.exercises.map((exercise) => exercise.exerciseId)),
-  );
-  const routineExerciseIds = new Set(
-    templates.flatMap((template) => template.exercises.map((exercise) => exercise.exerciseId)),
-  );
-  const visibleExercises = favoritesOnly
-    ? exercises.filter((exercise) => favorites.has(exercise.id))
-    : exercises;
+  const visibleExercises = exercises.filter((exercise) => {
+    const state = exerciseStates.get(exercise.id);
+
+    if (favoritesOnly && !favorites.has(exercise.id)) return false;
+    if (usedRecentlyOnly && !state?.usedRecently) return false;
+    if (inRoutineOnly && !state?.inRoutine) return false;
+
+    return true;
+  });
   const selectedHistory = selected
     ? sessions.filter((session) =>
         session.exercises.some((exercise) => exercise.exerciseId === selected.id),
@@ -118,16 +158,21 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
   return (
     <Screen>
       <ExerciseFilterBar
+        facets={facets}
         query={query}
         targetMuscle={targetMuscle}
         equipment={equipment}
         bodyPart={bodyPart}
         favoritesOnly={favoritesOnly}
+        usedRecentlyOnly={usedRecentlyOnly}
+        inRoutineOnly={inRoutineOnly}
         onQueryChange={setQuery}
         onTargetMuscleChange={setTargetMuscle}
         onEquipmentChange={setEquipment}
         onBodyPartChange={setBodyPart}
         onFavoritesOnlyChange={setFavoritesOnly}
+        onUsedRecentlyOnlyChange={setUsedRecentlyOnly}
+        onInRoutineOnlyChange={setInRoutineOnly}
         onSearch={search}
         loading={loading}
       />
@@ -144,6 +189,7 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
           onBack={() => setSelected(null)}
           onMetricChange={setMetric}
           onToggleFavorite={() => toggleFavorite(selected).catch(showError)}
+          onAddToActiveWorkout={() => addToActiveWorkout(selected).catch(showError)}
           setMessage={setMessage}
         />
       ) : null}
@@ -158,7 +204,7 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
             <ExerciseRow
               key={exercise.id}
               exercise={exercise}
-              badges={buildBadges(exercise.id, favorites, usedExerciseIds, routineExerciseIds)}
+              badges={buildBadges(exercise.id, exerciseStates, favorites)}
               selected={selected?.id === exercise.id}
               onPress={() => openExercise(exercise).catch(showError)}
             />
@@ -167,18 +213,39 @@ export function ExercisesScreen({ setMessage }: { setMessage: (value: string) =>
       </Section>
     </Screen>
   );
+
+  async function addToActiveWorkout(exercise: Exercise) {
+    const active = await apiFetch<{ data: WorkoutSession | null }>("/workout-sessions/active");
+
+    if (!active.data) {
+      setMessage("Empieza una rutina antes de anadir ejercicios");
+      return;
+    }
+
+    await apiFetch(`/workout-sessions/${active.data.id}/exercises`, {
+      method: "POST",
+      body: JSON.stringify({
+        exerciseId: exercise.id,
+        sets: [{ weightKg: 0, reps: 10, type: "NORMAL", restSeconds: 90 }],
+      }),
+    });
+
+    setMessage("Ejercicio anadido al entreno");
+    await loadExerciseStates(exercises.map((item) => item.id));
+  }
 }
 
 function buildBadges(
   exerciseId: string,
+  exerciseStates: Map<string, ExerciseState>,
   favorites: Set<string>,
-  usedExerciseIds: Set<string>,
-  routineExerciseIds: Set<string>,
 ) {
+  const state = exerciseStates.get(exerciseId);
+
   return [
     favorites.has(exerciseId) ? "Favorito" : null,
-    usedExerciseIds.has(exerciseId) ? "Reciente" : null,
-    routineExerciseIds.has(exerciseId) ? "En rutina" : null,
+    state?.usedRecently ? "Reciente" : null,
+    state?.inRoutine ? "En rutina" : null,
   ].filter((badge): badge is string => Boolean(badge));
 }
 

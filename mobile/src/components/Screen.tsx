@@ -9,8 +9,9 @@ export function Screen({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   content: {
     backgroundColor: colors.background,
-    gap: 16,
-    padding: 16,
+    gap: 18,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 128,
   },
 });

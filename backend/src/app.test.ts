@@ -1,7 +1,13 @@
 import { SignJWT } from "jose";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ExerciseSetType, ExerciseSource, WorkoutSessionStatus } from "@prisma/client";
+import {
+  ExerciseSetType,
+  ExerciseSource,
+  MeasurementUnits,
+  TrainingGoal,
+  WorkoutSessionStatus,
+} from "@prisma/client";
 import { app } from "./app";
 import { prisma } from "./lib/prisma";
 
@@ -163,6 +169,40 @@ describe("CheluisFIT API", () => {
     expect(measurements.body.data.length).toBeGreaterThan(0);
   });
 
+  it("persists authenticated training preferences", async () => {
+    const defaults = await authed(primaryAuth).get("/api/me/preferences");
+
+    expect(defaults.status).toBe(200);
+    expect(defaults.body.data).toMatchObject({
+      defaultRestSeconds: 90,
+      weeklyFrequency: 4,
+      goal: TrainingGoal.HYPERTROPHY,
+      units: MeasurementUnits.METRIC,
+    });
+
+    const updated = await authed(primaryAuth)
+      .patch("/api/me/preferences")
+      .send({
+        defaultRestSeconds: 120,
+        weeklyFrequency: 5,
+        goal: TrainingGoal.STRENGTH,
+        units: MeasurementUnits.METRIC,
+      });
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.data).toMatchObject({
+      defaultRestSeconds: 120,
+      weeklyFrequency: 5,
+      goal: TrainingGoal.STRENGTH,
+    });
+
+    const invalid = await authed(primaryAuth)
+      .patch("/api/me/preferences")
+      .send({ weeklyFrequency: 0 });
+
+    expect(invalid.status).toBe(400);
+  });
+
   it("searches local exercises", async () => {
     const result = await request(app).get(
       `/api/exercises?q=${encodeURIComponent(namespace)}&targetMuscle=pectorals`,
@@ -171,6 +211,18 @@ describe("CheluisFIT API", () => {
     expect(result.status).toBe(200);
     expect(result.body.data).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: exerciseId })]),
+    );
+  });
+
+  it("returns exercise facets for premium filters", async () => {
+    const result = await request(app).get("/api/exercises/facets");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.targetMuscles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ value: "pectorals" })]),
+    );
+    expect(result.body.data.equipment).toEqual(
+      expect.arrayContaining([expect.objectContaining({ value: "barbell" })]),
     );
   });
 
@@ -446,6 +498,60 @@ describe("CheluisFIT API", () => {
     await authed(primaryAuth)
       .patch(`/api/workout-sessions/${started.body.data.id}`)
       .send({ status: WorkoutSessionStatus.COMPLETED });
+  });
+
+  it("returns authenticated exercise states for favorites, history and routines", async () => {
+    await authed(primaryAuth)
+      .post("/api/favorite-exercises")
+      .send({ exerciseId });
+
+    const workout = await authed(primaryAuth)
+      .post("/api/workout-sessions")
+      .send({
+        performedAt: new Date().toISOString(),
+        exercises: [
+          {
+            exerciseId,
+            sets: [{ weightKg: 70, reps: 5, type: ExerciseSetType.NORMAL }],
+          },
+        ],
+      });
+
+    expect(workout.status).toBe(201);
+
+    const template = await authed(primaryAuth)
+      .post("/api/workout-templates")
+      .send({
+        name: "Estado ejercicios",
+        exercises: [
+          {
+            exerciseId,
+            sets: [{ targetWeightKg: 70, targetReps: 5 }],
+          },
+        ],
+      });
+
+    expect(template.status).toBe(201);
+
+    const result = await authed(primaryAuth).get(
+      `/api/me/exercise-states?exerciseIds=${exerciseId},${bodyweightExerciseId}`,
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          exerciseId,
+          isFavorite: true,
+          usedRecently: true,
+          inRoutine: true,
+        }),
+        expect.objectContaining({
+          exerciseId: bodyweightExerciseId,
+          isFavorite: false,
+        }),
+      ]),
+    );
   });
 
   it("validates workout and template payloads", async () => {

@@ -1,3 +1,4 @@
+import { Plus, Save, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import type { Exercise, ExerciseSetType, WorkoutSet, WorkoutTemplate } from "../api/types";
@@ -40,7 +41,16 @@ export function RoutineBuilderScreen({
 
   const totals = useMemo(() => {
     const setCount = exercises.reduce((total, exercise) => total + exercise.sets.length, 0);
-    return { exercises: exercises.length, sets: setCount };
+    const effectiveSets = exercises.reduce(
+      (total, exercise) => total + exercise.sets.filter((set) => set.type !== "WARMUP").length,
+      0,
+    );
+    const estimatedMinutes = Math.max(
+      Math.round(exercises.length * 4 + setCount * 1.5),
+      exercises.length ? 20 : 0,
+    );
+
+    return { exercises: exercises.length, sets: setCount, effectiveSets, estimatedMinutes };
   }, [exercises]);
 
   const addExercise = (exercise: Exercise) => {
@@ -88,11 +98,23 @@ export function RoutineBuilderScreen({
         <TextField value={name} onChangeText={setName} />
         <TextField value={notes} onChangeText={setNotes} placeholder="Notas" />
         <Text style={styles.meta}>
-          {totals.exercises} ejercicios · {totals.sets} series objetivo
+          Paso 1 de 4 · Datos, ejercicios, series y revision
+        </Text>
+        <Text style={styles.meta}>
+          {totals.exercises} ejercicios · {totals.sets} series objetivo · {totals.effectiveSets} efectivas · {totals.estimatedMinutes} min
         </Text>
         <View style={styles.actions}>
-          <Button label="Anadir ejercicio" onPress={() => setPickerOpen(true)} />
-          <Button label="Cancelar" variant="ghost" onPress={onCancel} />
+          <Button icon={Plus} label="Anadir ejercicio" onPress={() => setPickerOpen(true)} />
+          <Button icon={X} label="Cancelar" variant="ghost" onPress={onCancel} />
+        </View>
+      </Section>
+
+      <Section title="Presets rapidos">
+        <View style={styles.actions}>
+          <Button label="3x10" variant="secondary" onPress={() => applyPreset(3, 10)} />
+          <Button label="4x8" variant="secondary" onPress={() => applyPreset(4, 8)} />
+          <Button label="5x5" variant="secondary" onPress={() => applyPreset(5, 5)} />
+          <Button label="Warm + 3" variant="secondary" onPress={applyWarmupPreset} />
         </View>
       </Section>
 
@@ -108,6 +130,7 @@ export function RoutineBuilderScreen({
               canMoveUp={index > 0}
               canMoveDown={index < exercises.length - 1}
               onAddSet={() => addSet(exercise.clientId)}
+              onDuplicateExercise={() => duplicateExercise(exercise.clientId)}
               onDuplicateSet={(set) => duplicateSet(exercise.clientId, set)}
               onEditSet={(set) => setEditingSet({ exerciseClientId: exercise.clientId, set })}
               onMoveDown={() => moveExercise(index, 1)}
@@ -119,7 +142,7 @@ export function RoutineBuilderScreen({
         )}
       </Section>
 
-      <Button label="Guardar rutina" onPress={() => save().catch(showError)} />
+      <Button icon={Save} label="Guardar rutina" onPress={() => save().catch(showError)} />
 
       <WorkoutExercisePicker
         apiFetch={apiFetch}
@@ -159,6 +182,63 @@ export function RoutineBuilderScreen({
           ? { ...exercise, sets: [...exercise.sets, { ...set, clientId: createClientId() }] }
           : exercise,
       ),
+    );
+  }
+
+  function duplicateExercise(exerciseClientId: string) {
+    const exercise = exercises.find((item) => item.clientId === exerciseClientId);
+    if (!exercise) return;
+
+    const index = exercises.findIndex((item) => item.clientId === exerciseClientId);
+    const copy = {
+      ...exercise,
+      clientId: createClientId(),
+      sets: exercise.sets.map((set) => ({ ...set, clientId: createClientId() })),
+    };
+    const next = [...exercises];
+    next.splice(index + 1, 0, copy);
+    setExercises(next);
+  }
+
+  function applyPreset(setCount: number, reps: number) {
+    setExercises((current) =>
+      current.map((exercise) => ({
+        ...exercise,
+        sets: Array.from({ length: setCount }).map(() => ({
+          clientId: createClientId(),
+          targetWeightKg: exercise.sets[0]?.targetWeightKg ?? 60,
+          targetReps: reps,
+          type: "NORMAL" as const,
+          restSeconds: exercise.sets[0]?.restSeconds ?? 90,
+        })),
+      })),
+    );
+  }
+
+  function applyWarmupPreset() {
+    setExercises((current) =>
+      current.map((exercise) => {
+        const baseWeight = exercise.sets[0]?.targetWeightKg ?? 60;
+        return {
+          ...exercise,
+          sets: [
+            {
+              clientId: createClientId(),
+              targetWeightKg: Math.max(Math.round(baseWeight * 0.55), 0),
+              targetReps: 10,
+              type: "WARMUP",
+              restSeconds: 60,
+            },
+            ...Array.from({ length: 3 }).map(() => ({
+              clientId: createClientId(),
+              targetWeightKg: baseWeight,
+              targetReps: 8,
+              type: "NORMAL" as const,
+              restSeconds: 120,
+            })),
+          ],
+        };
+      }),
     );
   }
 

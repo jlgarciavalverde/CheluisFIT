@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getExerciseFacets,
   getLocalExerciseById,
   listLocalExercises,
   searchExternalExercises,
@@ -13,6 +14,15 @@ import {
 import { getAuthUser } from "../types/auth";
 
 export const exerciseRoutes = Router();
+
+exerciseRoutes.get("/facets", async (_req, res, next) => {
+  try {
+    const facets = await getExerciseFacets();
+    res.json(facets);
+  } catch (error) {
+    next(error);
+  }
+});
 
 exerciseRoutes.get("/", async (req, res, next) => {
   try {

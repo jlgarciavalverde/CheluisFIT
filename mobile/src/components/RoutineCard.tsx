@@ -1,48 +1,71 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Copy, Dumbbell, Pencil } from "lucide-react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { WorkoutTemplate } from "../api/types";
-import { colors, radius } from "../theme/tokens";
+import { colors, radius, shadow } from "../theme/tokens";
 import { Button } from "./Button";
 
 export function RoutineCard({
   template,
   onClone,
   onEdit,
+  onOpen,
   onStart,
 }: {
   template: WorkoutTemplate;
   onClone: () => void;
   onEdit: () => void;
+  onOpen?: () => void;
   onStart: () => void;
 }) {
   const setCount = template.exercises.reduce((total, exercise) => total + exercise.sets.length, 0);
+  const estimatedMinutes = Math.max(Math.round(template.exercises.length * 4 + setCount * 1.5), 20);
 
   return (
-    <View style={styles.card}>
-      <View style={styles.copy}>
-        <Text style={styles.title}>{template.name}</Text>
-        <Text style={styles.meta}>
-          {template.exercises.length} ejercicios · {setCount} series
-        </Text>
+    <Pressable accessibilityRole="button" onPress={onOpen} style={styles.card}>
+      <View style={styles.header}>
+        <View style={styles.copy}>
+          <Text style={styles.title}>{template.name}</Text>
+          <Text style={styles.meta}>
+            {template.exercises.length} ejercicios · {setCount} series
+          </Text>
+        </View>
+        <View style={styles.pill}>
+          <Text style={styles.pillText}>{estimatedMinutes} min</Text>
+        </View>
       </View>
+
+      <View style={styles.summary}>
+        <Text style={styles.summaryLabel}>Vista rápida</Text>
+        <Text style={styles.summaryText}>{template.exercises.length} ejercicios · {setCount} series · {estimatedMinutes} min</Text>
+      </View>
+
       <View style={styles.actions}>
-        <Button label="Editar" variant="ghost" onPress={onEdit} />
-        <Button label="Clonar" variant="secondary" onPress={onClone} />
-        <Button label="Empezar" onPress={onStart} />
+        <Button icon={Dumbbell} label="Empezar" onPress={onStart} />
+        <Button icon={Pencil} label="Editar" variant="ghost" onPress={onEdit} />
+        <Button icon={Copy} label="Clonar" variant="secondary" onPress={onClone} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface2,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     padding: 12,
+    ...shadow.card,
+  },
+  header: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
   },
   copy: {
+    flex: 1,
     gap: 4,
   },
   title: {
@@ -53,9 +76,47 @@ const styles = StyleSheet.create({
   meta: {
     color: colors.muted,
     fontSize: 12,
+    fontWeight: "600",
+  },
+  pill: {
+    backgroundColor: `${colors.cyan}1A`,
+    borderColor: colors.cyan,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  pillText: {
+    color: colors.cyan,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  summary: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  summaryLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  summaryText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: "700",
   },
   actions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
 });

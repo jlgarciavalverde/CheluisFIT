@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { CheckCircle2, Plus, TimerOff } from "lucide-react-native";
 import type { Exercise, WorkoutSession, WorkoutSet } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { ActiveWorkoutExerciseCard } from "../components/ActiveWorkoutExerciseCard";
@@ -16,11 +17,19 @@ import { colors } from "../theme/tokens";
 export function ActiveWorkoutScreen({
   session,
   onActiveChange,
+  restLeft,
+  restTotal,
+  onAdjustRest,
+  onSkipRest,
   onStartRest,
   setMessage,
 }: {
   session: WorkoutSession | null;
   onActiveChange: () => void;
+  restLeft: number;
+  restTotal: number;
+  onAdjustRest: (seconds: number) => void;
+  onSkipRest: () => void;
   onStartRest: (seconds: number) => void;
   setMessage: (value: string) => void;
 }) {
@@ -38,6 +47,8 @@ export function ActiveWorkoutScreen({
       </Screen>
     );
   }
+
+  const nextSetId = getNextSetId(session);
 
   const completeSet = async (setId: string, restSeconds: number) => {
     await apiFetch(`/workout-sessions/${session.id}/sets/${setId}`, {
@@ -105,7 +116,19 @@ export function ActiveWorkoutScreen({
             { label: "Duracion", value: formatDuration(session.startedAt) },
           ]}
         />
-        <Button label="Anadir ejercicio" variant="secondary" onPress={() => setPickerOpen(true)} />
+        {restTotal > 0 ? (
+          <View style={styles.restPanel}>
+            <Text style={styles.restTitle}>
+              {restLeft > 0 ? `Descanso ${formatClock(restLeft)}` : "Descanso terminado"}
+            </Text>
+            <View style={styles.restActions}>
+              <Button label="-15s" size="sm" variant="ghost" onPress={() => onAdjustRest(-15)} />
+              <Button label="+15s" size="sm" variant="ghost" onPress={() => onAdjustRest(15)} />
+              <Button icon={TimerOff} label="Saltar" size="sm" variant="secondary" onPress={onSkipRest} />
+            </View>
+          </View>
+        ) : null}
+        <Button icon={Plus} label="Anadir ejercicio" variant="secondary" onPress={() => setPickerOpen(true)} />
       </Section>
 
       <WorkoutSummaryPanel summary={session.muscleSummary} />
@@ -115,6 +138,7 @@ export function ActiveWorkoutScreen({
           <ActiveWorkoutExerciseCard
             key={exercise.id}
             workoutExercise={exercise}
+            nextSetId={nextSetId}
             onAddSet={(workoutExercise) =>
               addSet(workoutExercise.id, workoutExercise.sets.at(-1)).catch(showError)
             }
@@ -126,7 +150,7 @@ export function ActiveWorkoutScreen({
         ))}
       </Section>
 
-      <Button label="Completar entreno" onPress={() => completeWorkout().catch(showError)} />
+      <Button icon={CheckCircle2} label="Completar entreno" onPress={() => completeWorkout().catch(showError)} />
 
       <WorkoutExercisePicker
         apiFetch={apiFetch}
@@ -175,6 +199,21 @@ function totalVolume(session: WorkoutSession) {
   );
 }
 
+function getNextSetId(session: WorkoutSession) {
+  for (const exercise of session.exercises) {
+    const nextSet = exercise.sets.find((set) => !set.completedAt);
+    if (nextSet) return nextSet.id;
+  }
+
+  return null;
+}
+
+function formatClock(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${minutes}:${rest.toString().padStart(2, "0")}`;
+}
+
 function formatDuration(startedAt: string) {
   const diffMs = Math.max(Date.now() - new Date(startedAt).getTime(), 0);
   const minutes = Math.floor(diffMs / 60000);
@@ -188,6 +227,24 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
+    gap: 8,
+  },
+  restPanel: {
+    backgroundColor: `${colors.cyan}12`,
+    borderColor: colors.cyan,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    padding: 10,
+  },
+  restTitle: {
+    color: colors.cyan,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  restActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
 });

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { MeasurementUnits, Prisma, TrainingGoal } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { sanitizeUser } from "./authService";
 
@@ -9,6 +9,13 @@ type UpdateProfileInput = {
   birthDate?: Date;
   currentWeightKg?: number;
   currentHeightCm?: number;
+};
+
+type UpdateTrainingPreferenceInput = {
+  defaultRestSeconds?: number;
+  weeklyFrequency?: number;
+  goal?: TrainingGoal;
+  units?: MeasurementUnits;
 };
 
 export async function getProfile(userId: string) {
@@ -82,5 +89,61 @@ export async function addBodyMeasurement(
     weightKg: measurement.weightKg,
     heightCm: measurement.heightCm,
     measuredAt: measurement.measuredAt.toISOString(),
+  };
+}
+
+export async function getTrainingPreference(userId: string) {
+  const preference = await prisma.userTrainingPreference.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+
+  return { data: normalizeTrainingPreference(preference) };
+}
+
+export async function updateTrainingPreference(
+  userId: string,
+  input: UpdateTrainingPreferenceInput,
+) {
+  const preference = await prisma.userTrainingPreference.upsert({
+    where: { userId },
+    create: {
+      userId,
+      defaultRestSeconds: input.defaultRestSeconds,
+      weeklyFrequency: input.weeklyFrequency,
+      goal: input.goal,
+      units: input.units,
+    },
+    update: {
+      defaultRestSeconds: input.defaultRestSeconds,
+      weeklyFrequency: input.weeklyFrequency,
+      goal: input.goal,
+      units: input.units,
+    },
+  });
+
+  return { data: normalizeTrainingPreference(preference) };
+}
+
+function normalizeTrainingPreference(preference: {
+  id: string;
+  userId: string;
+  defaultRestSeconds: number;
+  weeklyFrequency: number;
+  goal: TrainingGoal;
+  units: MeasurementUnits;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: preference.id,
+    userId: preference.userId,
+    defaultRestSeconds: preference.defaultRestSeconds,
+    weeklyFrequency: preference.weeklyFrequency,
+    goal: preference.goal,
+    units: preference.units,
+    createdAt: preference.createdAt.toISOString(),
+    updatedAt: preference.updatedAt.toISOString(),
   };
 }

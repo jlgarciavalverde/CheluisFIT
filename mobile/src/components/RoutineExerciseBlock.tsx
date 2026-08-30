@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 import type { Exercise, ExerciseSetType } from "../api/types";
 import { colors, radius } from "../theme/tokens";
@@ -27,6 +28,7 @@ export function RoutineExerciseBlock({
   canMoveDown,
   onAddSet,
   onDuplicateSet,
+  onDuplicateExercise,
   onEditSet,
   onMoveDown,
   onMoveUp,
@@ -39,6 +41,7 @@ export function RoutineExerciseBlock({
   canMoveDown: boolean;
   onAddSet: () => void;
   onDuplicateSet: (set: RoutineBuilderSet) => void;
+  onDuplicateExercise: () => void;
   onEditSet: (set: RoutineBuilderSet) => void;
   onMoveDown: () => void;
   onMoveUp: () => void;
@@ -56,8 +59,8 @@ export function RoutineExerciseBlock({
           </Text>
         </View>
         <View style={[styles.iconRow, !(canMoveUp || canMoveDown) && styles.iconRowDisabled]}>
-          <IconButton label="Subir ejercicio" symbol="^" onPress={onMoveUp} />
-          <IconButton label="Bajar ejercicio" symbol="v" onPress={onMoveDown} />
+          <IconButton label="Subir ejercicio" icon={ArrowUp} onPress={onMoveUp} />
+          <IconButton label="Bajar ejercicio" icon={ArrowDown} onPress={onMoveDown} />
         </View>
       </View>
 
@@ -69,16 +72,17 @@ export function RoutineExerciseBlock({
             </Text>
             <SetTypeChip type={set.type} compact />
             <Text style={styles.rest}>{set.restSeconds}s</Text>
-            <Button label="Editar" variant="ghost" onPress={() => onEditSet(set)} />
-            <Button label="Dup" variant="ghost" onPress={() => onDuplicateSet(set)} />
-            <Button label="Del" variant="ghost" onPress={() => onRemoveSet(set)} />
+            <IconButton label="Editar serie" icon={Pencil} onPress={() => onEditSet(set)} />
+            <IconButton label="Duplicar serie" icon={Copy} onPress={() => onDuplicateSet(set)} />
+            <IconButton label="Eliminar serie" icon={Trash2} onPress={() => onRemoveSet(set)} />
           </View>
         ))}
       </View>
 
       <View style={styles.actions}>
-        <Button label="Anadir serie" variant="secondary" onPress={onAddSet} />
-        <Button label="Eliminar ejercicio" variant="ghost" onPress={onRemoveExercise} />
+        <Button icon={Plus} label="Serie" variant="secondary" onPress={onAddSet} />
+        <Button icon={Copy} label="Duplicar" variant="ghost" onPress={onDuplicateExercise} />
+        <Button icon={Trash2} label="Eliminar" variant="ghost" onPress={onRemoveExercise} />
       </View>
     </View>
   );
@@ -147,6 +151,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
 });

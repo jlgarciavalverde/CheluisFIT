@@ -1,20 +1,35 @@
+import * as Haptics from "expo-haptics";
+import type { LucideIcon } from "lucide-react-native";
 import { Pressable, StyleSheet, Text } from "react-native";
-import { colors, radius } from "../theme/tokens";
+import { colors, opacity, radius, shadow, spacing } from "../theme/tokens";
 
 type ButtonProps = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  icon?: LucideIcon;
   size?: "md" | "sm";
   variant?: "primary" | "secondary" | "ghost";
 };
 
-export function Button({ label, onPress, disabled, size = "md", variant = "primary" }: ButtonProps) {
+export function Button({
+  label,
+  onPress,
+  disabled,
+  icon: Icon,
+  size = "md",
+  variant = "primary",
+}: ButtonProps) {
+  const labelColor = variant === "primary" ? colors.primaryOn : colors.text;
+
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => undefined);
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.base,
         styles[size],
@@ -23,7 +38,8 @@ export function Button({ label, onPress, disabled, size = "md", variant = "prima
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text style={[styles.label, variant === "primary" ? styles.primaryLabel : styles.altLabel]}>
+      {Icon ? <Icon color={labelColor} size={size === "sm" ? 15 : 17} strokeWidth={2.8} /> : null}
+      <Text style={[styles.label, { color: labelColor }]}>
         {label}
       </Text>
     </Pressable>
@@ -33,42 +49,42 @@ export function Button({ label, onPress, disabled, size = "md", variant = "prima
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
+    flexDirection: "row",
+    gap: spacing.sm,
     justifyContent: "center",
   },
   md: {
     minHeight: 46,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
   sm: {
-    minHeight: 32,
-    paddingHorizontal: 10,
+    minHeight: 34,
+    paddingHorizontal: 12,
   },
   primary: {
     backgroundColor: colors.lime,
+    ...shadow.card,
   },
   secondary: {
-    backgroundColor: "transparent",
-    borderColor: colors.cyan,
+    backgroundColor: colors.surface2,
+    borderColor: colors.borderStrong,
     borderWidth: 1,
   },
   ghost: {
-    backgroundColor: colors.surface2,
+    backgroundColor: "transparent",
+    borderColor: colors.border,
+    borderWidth: 1,
   },
   disabled: {
-    opacity: 0.55,
+    opacity: opacity.disabled,
   },
   pressed: {
-    opacity: 0.82,
+    opacity: opacity.pressed,
   },
   label: {
     fontSize: 14,
     fontWeight: "800",
-  },
-  primaryLabel: {
-    color: colors.background,
-  },
-  altLabel: {
-    color: colors.text,
+    letterSpacing: 0,
   },
 });

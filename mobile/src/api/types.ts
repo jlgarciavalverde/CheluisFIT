@@ -37,6 +37,28 @@ export type Exercise = {
   tips: string[];
 };
 
+export type ExerciseFacetOption = {
+  value: string;
+  count: number;
+};
+
+export type ExerciseFacets = {
+  targetMuscles: ExerciseFacetOption[];
+  secondaryMuscles: ExerciseFacetOption[];
+  bodyParts: ExerciseFacetOption[];
+  equipment: ExerciseFacetOption[];
+};
+
+export type ExerciseState = {
+  exerciseId: string;
+  isFavorite: boolean;
+  usedRecently: boolean;
+  inRoutine: boolean;
+  lastUsedAt: string | null;
+  sessionCount: number;
+  routineCount: number;
+};
+
 export type ProgressPoint = {
   performedAt: string;
   sessionId: string;
@@ -144,6 +166,21 @@ export type BodyMeasurement = {
   weightKg: number;
   heightCm: number;
   measuredAt: string;
+};
+
+export type TrainingGoal = "HYPERTROPHY" | "STRENGTH" | "FAT_LOSS" | "GENERAL_FITNESS";
+
+export type MeasurementUnits = "METRIC";
+
+export type TrainingPreference = {
+  id: string;
+  userId: string;
+  defaultRestSeconds: number;
+  weeklyFrequency: number;
+  goal: TrainingGoal;
+  units: MeasurementUnits;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type WorkoutTemplate = {
