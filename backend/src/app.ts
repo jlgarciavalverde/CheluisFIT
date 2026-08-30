@@ -21,6 +21,7 @@ const isProduction = process.env.NODE_ENV === "production";
 
 export const app = express();
 
+if (isProduction) app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
 app.use(helmet());
