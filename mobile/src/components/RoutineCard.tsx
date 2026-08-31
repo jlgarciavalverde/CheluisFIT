@@ -24,7 +24,11 @@ export const RoutineCard = memo(function RoutineCard({
   const estimatedMinutes = Math.max(Math.round(template.exercises.length * 4 + setCount * 1.5), 20);
 
   return (
-    <Pressable accessibilityRole="button" onPress={onOpen} style={styles.card}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onOpen}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+    >
       <View style={styles.header}>
         <View style={styles.copy}>
           <Text style={styles.title}>{template.name}</Text>
@@ -64,6 +68,10 @@ const styles = StyleSheet.create({
     padding: 12,
     ...shadow.card,
   },
+  pressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.99 }],
+  },
   header: {
     alignItems: "flex-start",
     flexDirection: "row",
@@ -85,7 +93,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   pill: {
-    backgroundColor: withOpacity(colors.cyan, 0.10),
+    backgroundColor: withOpacity(colors.cyan, 0.1),
     borderColor: colors.cyan,
     borderRadius: radius.sm,
     borderWidth: 1,

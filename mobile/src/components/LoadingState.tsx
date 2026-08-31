@@ -1,5 +1,5 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "../theme/tokens";
+import { colors, radius, withOpacity } from "../theme/tokens";
 
 export function LoadingState({ title = "Cargando" }: { title?: string }) {
   return (
@@ -13,16 +13,18 @@ export function LoadingState({ title = "Cargando" }: { title?: string }) {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface2,
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
     gap: 10,
-    padding: 16,
+    minHeight: 124,
+    justifyContent: "center",
+    padding: 18,
   },
   text: {
-    color: colors.muted,
+    color: withOpacity(colors.textSoft, 0.86),
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });

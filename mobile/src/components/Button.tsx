@@ -26,6 +26,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
+      hitSlop={4}
       onPress={() => {
         Haptics.selectionAsync().catch(() => undefined);
         onPress();
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: opacity.pressed,
+    transform: [{ scale: 0.98 }],
   },
   label: {
     fontSize: 14,

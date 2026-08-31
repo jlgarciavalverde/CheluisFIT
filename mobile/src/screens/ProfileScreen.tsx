@@ -1,17 +1,29 @@
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
-import type { AuthUser, BodyMeasurement, TrainingGoal, TrainingPreference } from "../api/types";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { ChevronDown, ChevronUp, Dumbbell, Ruler, Scale } from "lucide-react-native";
+import type {
+  AuthUser,
+  BodyMeasurement,
+  DashboardData,
+  ExerciseRecordSummary,
+  MuscleSummaryPoint,
+  TrainingGoal,
+  TrainingPreference,
+} from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { showError } from "../utils/errors";
 import { useToast } from "../contexts/ToastContext";
 import { Button } from "../components/Button";
 import { MetricTile } from "../components/MetricTile";
+import { MuscleMap } from "../components/MuscleMap";
+import { PersonalRecordCard } from "../components/PersonalRecordCard";
 import { ProgressChart } from "../components/ProgressChart";
 import { Screen } from "../components/Screen";
 import { Section } from "../components/Section";
 import { SegmentedTabs } from "../components/SegmentedTabs";
 import { TextField } from "../components/TextField";
-import { colors, radius, shadow } from "../theme/tokens";
+import { UserAvatar } from "../components/UserAvatar";
+import { colors, radius, shadow, withOpacity } from "../theme/tokens";
 
 export function ProfileScreen() {
   const showToast = useToast();
@@ -29,6 +41,11 @@ export function ProfileScreen() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
+  const [dangerExpanded, setDangerExpanded] = useState(false);
+  const [muscleStats, setMuscleStats] = useState<MuscleSummaryPoint[]>([]);
+  const [personalRecords, setPersonalRecords] = useState<
+    Array<{ exerciseName: string; record: ExerciseRecordSummary }>
+  >([]);
 
   useEffect(() => {
     if (!user) return;
@@ -42,15 +59,41 @@ export function ProfileScreen() {
   }, [user]);
 
   useEffect(() => {
-    Promise.all([
-      apiFetch<{ data: BodyMeasurement[] }>("/me/body-measurements"),
-      apiFetch<{ data: TrainingPreference }>("/me/preferences"),
-    ])
-      .then(([measurementResult, preferenceResult]) => {
+    async function loadProfileData() {
+      const [measurementResult, preferenceResult, muscleStatsResult, dashboardResult] =
+        await Promise.all([
+          apiFetch<{ data: BodyMeasurement[] }>("/me/body-measurements"),
+          apiFetch<{ data: TrainingPreference }>("/me/preferences"),
+          apiFetch<{ data: MuscleSummaryPoint[] }>("/me/muscle-stats"),
+          apiFetch<{ data: DashboardData }>("/me/dashboard"),
+        ]);
+
+      const topExercises = dashboardResult.data.mostWorkedExercises.slice(0, 3);
+      const recordResults = await Promise.all(
+        topExercises.map((exercise) =>
+          apiFetch<{ data: ExerciseRecordSummary }>(`/exercises/${exercise.exerciseId}/records`),
+        ),
+      );
+
+      return {
+        measurementResult,
+        preferenceResult,
+        muscleStatsResult,
+        records: topExercises.map((exercise, index) => ({
+          exerciseName: exercise.name,
+          record: recordResults[index].data,
+        })),
+      };
+    }
+
+    loadProfileData()
+      .then(({ measurementResult, preferenceResult, muscleStatsResult, records }) => {
         setMeasurements(measurementResult.data);
         setDefaultRest(String(preferenceResult.data.defaultRestSeconds));
         setWeeklyFrequency(String(preferenceResult.data.weeklyFrequency));
         setGoal(preferenceResult.data.goal);
+        setMuscleStats(muscleStatsResult.data);
+        setPersonalRecords(records);
       })
       .catch(() => undefined);
   }, [apiFetch]);
@@ -131,25 +174,21 @@ export function ProfileScreen() {
       showToast("Introduce tu contrasena para confirmar");
       return;
     }
-    Alert.alert(
-      "Eliminar cuenta",
-      "Esta accion es irreversible. Se borraran todos tus datos.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () => {
-            apiFetch("/me", {
-              method: "DELETE",
-              body: JSON.stringify({ password: deletePassword }),
-            })
-              .then(() => logout())
-              .catch(showError);
-          },
+    Alert.alert("Eliminar cuenta", "Esta accion es irreversible. Se borraran todos tus datos.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => {
+          apiFetch("/me", {
+            method: "DELETE",
+            body: JSON.stringify({ password: deletePassword }),
+          })
+            .then(() => logout())
+            .catch(showError);
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const latestMeasurement =
@@ -158,21 +197,40 @@ export function ProfileScreen() {
   const prevMeasurement =
     measurements.length > 1 ? measurements[measurements.length - 2].weightKg : null;
   const weightDelta = latestMeasurement - (prevMeasurement ?? latestMeasurement);
+  const DangerIcon = dangerExpanded ? ChevronUp : ChevronDown;
 
   return (
     <Screen>
-      <Section title="Perfil">
-        <View style={styles.profileCard}>
-          <Text style={styles.name}>
-            {user.firstName} {user.lastName1}
-          </Text>
-          <Text style={styles.meta}>{user.email}</Text>
-          <View style={styles.metricGrid}>
-            <MetricTile label="Peso" value={`${user.currentWeightKg} kg`} />
-            <MetricTile label="Altura" value={`${user.currentHeightCm} cm`} />
-          </View>
+      <View style={styles.headerCard}>
+        <UserAvatar firstName={user.firstName} lastName={user.lastName1} />
+        <Text style={styles.headerName}>
+          {user.firstName} {user.lastName1}
+        </Text>
+        <Text style={styles.headerEmail}>{user.email}</Text>
+        <View style={styles.metricGrid}>
+          <MetricTile label="Peso" value={`${user.currentWeightKg}`} icon={Scale} subtitle="kg" />
+          <MetricTile label="Altura" value={`${user.currentHeightCm}`} icon={Ruler} subtitle="cm" />
+          <MetricTile label="Entrenos" value={weeklyFrequency} icon={Dumbbell} subtitle="/semana" />
         </View>
+      </View>
+
+      <Section title="Mapa muscular general">
+        <MuscleMap summary={muscleStats} size="lg" showLegend />
       </Section>
+
+      {personalRecords.length > 0 ? (
+        <Section title="Records personales">
+          <View style={styles.recordList}>
+            {personalRecords.map(({ exerciseName, record }) => (
+              <PersonalRecordCard
+                key={record.exerciseId}
+                exerciseName={exerciseName}
+                record={record}
+              />
+            ))}
+          </View>
+        </Section>
+      ) : null}
 
       <Section title="Datos personales">
         <View style={styles.panel}>
@@ -226,9 +284,7 @@ export function ProfileScreen() {
         <View style={styles.panel}>
           <ProgressChart
             values={measurements.map((measurement) => measurement.weightKg)}
-            labels={measurements.map((measurement) =>
-              measurement.measuredAt,
-            )}
+            labels={measurements.map((measurement) => measurement.measuredAt)}
           />
           <View style={styles.inlineSummary}>
             <Text style={styles.meta}>{measurements.length} mediciones guardadas</Text>
@@ -310,20 +366,24 @@ export function ProfileScreen() {
 
       <Section title="Zona peligrosa">
         <View style={styles.dangerPanel}>
-          <Text style={styles.dangerText}>
-            Al eliminar tu cuenta se borraran todos tus datos permanentemente.
-          </Text>
-          <TextField
-            placeholder="Introduce tu contrasena"
-            value={deletePassword}
-            onChangeText={setDeletePassword}
-            secureTextEntry
-          />
-          <Button
-            label="Eliminar cuenta"
-            variant="ghost"
-            onPress={confirmDeleteAccount}
-          />
+          <Pressable style={styles.dangerHeader} onPress={() => setDangerExpanded(!dangerExpanded)}>
+            <Text style={styles.dangerText}>Eliminar cuenta permanentemente</Text>
+            <DangerIcon size={16} color={colors.error} />
+          </Pressable>
+          {dangerExpanded ? (
+            <View style={styles.dangerContent}>
+              <Text style={styles.dangerWarning}>
+                Al eliminar tu cuenta se borraran todos tus datos permanentemente.
+              </Text>
+              <TextField
+                placeholder="Introduce tu contrasena"
+                value={deletePassword}
+                onChangeText={setDeletePassword}
+                secureTextEntry
+              />
+              <Button label="Eliminar cuenta" variant="ghost" onPress={confirmDeleteAccount} />
+            </View>
+          ) : null}
         </View>
       </Section>
     </Screen>
@@ -336,18 +396,33 @@ function formatInputDate(value?: string) {
 }
 
 const styles = StyleSheet.create({
-  profileCard: {
+  headerCard: {
+    alignItems: "center",
     backgroundColor: colors.surface2,
     borderColor: colors.border,
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 10,
-    padding: 12,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
     ...shadow.card,
+  },
+  headerName: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  headerEmail: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "600",
   },
   metricGrid: {
     flexDirection: "row",
     gap: 10,
+    marginTop: 8,
+    width: "100%",
   },
   panel: {
     backgroundColor: colors.surface2,
@@ -358,17 +433,15 @@ const styles = StyleSheet.create({
     padding: 12,
     ...shadow.card,
   },
+  recordList: {
+    gap: 10,
+  },
   row: {
     flexDirection: "row",
     gap: 8,
   },
   flex: {
     flex: 1,
-  },
-  name: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "900",
   },
   meta: {
     color: colors.muted,
@@ -390,12 +463,28 @@ const styles = StyleSheet.create({
     borderColor: colors.error,
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 10,
+    overflow: "hidden",
+  },
+  dangerHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     padding: 12,
   },
   dangerText: {
     color: colors.error,
     fontSize: 13,
+    fontWeight: "800",
+  },
+  dangerContent: {
+    borderTopColor: withOpacity(colors.error, 0.2),
+    borderTopWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  dangerWarning: {
+    color: colors.muted,
+    fontSize: 12,
     fontWeight: "600",
   },
 });

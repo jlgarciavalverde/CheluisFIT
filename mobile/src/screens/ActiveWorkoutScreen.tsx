@@ -1,26 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { CheckCircle2, Plus, TimerOff } from "lucide-react-native";
 import type { Exercise, WorkoutSet } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { showError } from "../utils/errors";
-import {
-  completedSets,
-  formatClock,
-  formatDuration,
-  totalSets,
-  totalVolume,
-} from "../utils/workout";
+import { completedSets, formatDuration, totalSets, totalVolume } from "../utils/workout";
 import { useToast } from "../contexts/ToastContext";
 import { useWorkout } from "../contexts/WorkoutContext";
 import { ActiveWorkoutExerciseCard } from "../components/ActiveWorkoutExerciseCard";
 import { Button } from "../components/Button";
 import { EmptyState } from "../components/EmptyState";
+import { RestTimerRing } from "../components/RestTimerRing";
 import { Screen } from "../components/Screen";
 import { Section } from "../components/Section";
 import { SetEditorSheet } from "../components/SetEditorSheet";
 import { StatStrip } from "../components/StatStrip";
+import { TextField } from "../components/TextField";
 import { WorkoutExercisePicker } from "../components/WorkoutExercisePicker";
+import { WorkoutProgressBar } from "../components/WorkoutProgressBar";
 import { WorkoutSummaryPanel } from "../components/WorkoutSummaryPanel";
 import { colors, withOpacity } from "../theme/tokens";
 
@@ -38,6 +35,8 @@ export function ActiveWorkoutScreen() {
   } = useWorkout();
   const [editingSet, setEditingSet] = useState<WorkoutSet | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [sessionNotes, setSessionNotes] = useState("");
+  const lastSyncedNotes = useRef("");
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -45,6 +44,29 @@ export function ActiveWorkoutScreen() {
     const id = setInterval(() => setTick((n) => n + 1), 60_000);
     return () => clearInterval(id);
   }, [session]);
+
+  useEffect(() => {
+    const nextNotes = session?.notes ?? "";
+    lastSyncedNotes.current = nextNotes;
+    setSessionNotes(nextNotes);
+  }, [session?.id, session?.notes]);
+
+  useEffect(() => {
+    if (!session || sessionNotes === lastSyncedNotes.current) return;
+
+    const timer = setTimeout(() => {
+      apiFetch(`/workout-sessions/${session.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ notes: sessionNotes.trim() ? sessionNotes : null }),
+      })
+        .then(() => {
+          lastSyncedNotes.current = sessionNotes;
+        })
+        .catch(showError);
+    }, 650);
+
+    return () => clearTimeout(timer);
+  }, [apiFetch, session, sessionNotes]);
 
   if (!session) {
     return (
@@ -132,7 +154,8 @@ export function ActiveWorkoutScreen() {
     <Screen>
       <Section title="Entreno actual">
         <Text style={styles.meta}>
-          {formatDate(session.startedAt)} · {session.status === "COMPLETED" ? "Completado" : "En progreso"}
+          {formatDate(session.startedAt)} ·{" "}
+          {session.status === "COMPLETED" ? "Completado" : "En progreso"}
         </Text>
         <StatStrip
           items={[
@@ -141,21 +164,36 @@ export function ActiveWorkoutScreen() {
             { label: "Duracion", value: formatDuration(session.startedAt) },
           ]}
         />
+        <WorkoutProgressBar
+          completed={countCompletedExercises(session)}
+          total={session.exercises.length}
+        />
+        <TextField
+          placeholder="Notas del entreno"
+          value={sessionNotes}
+          onChangeText={setSessionNotes}
+          multiline
+        />
         {restTotal > 0 ? (
           <View style={styles.restPanel}>
-            <Text style={styles.restTitle}>
-              {restLeft > 0 ? `Descanso ${formatClock(restLeft)}` : "Descanso terminado"}
-            </Text>
-            <View style={styles.restActions}>
-              <Button label="-15s" size="sm" variant="ghost" onPress={() => adjustRest(-15)} />
-              <Button label="+15s" size="sm" variant="ghost" onPress={() => adjustRest(15)} />
-              <Button
-                icon={TimerOff}
-                label="Saltar"
-                size="sm"
-                variant="secondary"
-                onPress={skipRest}
-              />
+            <View style={styles.restContent}>
+              <RestTimerRing secondsLeft={restLeft} totalSeconds={restTotal} />
+              <View style={styles.restInfo}>
+                <Text style={styles.restTitle}>
+                  {restLeft > 0 ? "Descansando..." : "Descanso terminado"}
+                </Text>
+                <View style={styles.restActions}>
+                  <Button label="-15s" size="sm" variant="ghost" onPress={() => adjustRest(-15)} />
+                  <Button label="+15s" size="sm" variant="ghost" onPress={() => adjustRest(15)} />
+                  <Button
+                    icon={TimerOff}
+                    label="Saltar"
+                    size="sm"
+                    variant="secondary"
+                    onPress={skipRest}
+                  />
+                </View>
+              </View>
             </View>
           </View>
         ) : null}
@@ -187,11 +225,7 @@ export function ActiveWorkoutScreen() {
         ))}
       </Section>
 
-      <Button
-        icon={CheckCircle2}
-        label="Completar entreno"
-        onPress={completeWorkout}
-      />
+      <Button icon={CheckCircle2} label="Completar entreno" onPress={completeWorkout} />
 
       <WorkoutExercisePicker
         apiFetch={apiFetch}
@@ -231,6 +265,14 @@ function getNextSetId(session: {
   return null;
 }
 
+function countCompletedExercises(session: {
+  exercises: Array<{ sets: Array<{ completedAt: string | null }> }>;
+}) {
+  return session.exercises.filter((exercise) =>
+    exercise.sets.every((set) => set.completedAt !== null),
+  ).length;
+}
+
 const styles = StyleSheet.create({
   meta: {
     color: colors.muted,
@@ -241,8 +283,16 @@ const styles = StyleSheet.create({
     borderColor: colors.cyan,
     borderRadius: 14,
     borderWidth: 1,
+    padding: 12,
+  },
+  restContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
+  },
+  restInfo: {
+    flex: 1,
     gap: 8,
-    padding: 10,
   },
   restTitle: {
     color: colors.cyan,

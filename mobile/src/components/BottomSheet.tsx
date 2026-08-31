@@ -10,7 +10,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { colors, radius, shadow } from "../theme/tokens";
+import { colors, radius, shadow, withOpacity } from "../theme/tokens";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 const MAX_HEIGHT = SCREEN_HEIGHT * 0.85;
@@ -134,9 +134,9 @@ const styles = StyleSheet.create({
   sheet: {
     ...shadow.floating,
     backgroundColor: colors.surface2,
-    borderColor: colors.border,
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
+    borderColor: withOpacity(colors.borderStrong, 0.75),
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     borderWidth: 1,
     maxHeight: MAX_HEIGHT,
   },
@@ -146,10 +146,10 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   handle: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.borderStrong,
     borderRadius: 4,
     height: 4,
-    width: 42,
+    width: 44,
   },
   scroll: {
     flexGrow: 0,

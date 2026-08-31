@@ -1,9 +1,10 @@
 import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
 import type { Exercise, ExerciseSetType } from "../api/types";
-import { colors, radius } from "../theme/tokens";
+import { colors, radius, withOpacity } from "../theme/tokens";
 import { Button } from "./Button";
 import { IconButton } from "./IconButton";
+import { MuscleChip } from "./MuscleChip";
 import { getSetTypeColor, SetTypeChip } from "./SetTypeChip";
 
 export type RoutineBuilderSet = {
@@ -51,12 +52,19 @@ export function RoutineExerciseBlock({
   return (
     <View style={styles.card}>
       <View style={styles.header}>
+        <View style={styles.numberBadge}>
+          <Text style={styles.numberText}>{index + 1}</Text>
+        </View>
         <View style={styles.copy}>
-          <Text style={styles.kicker}>#{index + 1}</Text>
           <Text style={styles.title}>{item.exercise.name}</Text>
-          <Text style={styles.meta}>
-            {item.exercise.targetMuscles.join(", ")} · {item.exercise.equipment.join(", ")}
-          </Text>
+          <View style={styles.chipRow}>
+            {item.exercise.targetMuscles.slice(0, 2).map((muscle) => (
+              <MuscleChip key={muscle} label={muscle} type="primary" />
+            ))}
+            {item.exercise.equipment.length > 0 ? (
+              <Text style={styles.equipmentText}>{item.exercise.equipment[0]}</Text>
+            ) : null}
+          </View>
         </View>
         <View style={[styles.iconRow, !(canMoveUp || canMoveDown) && styles.iconRowDisabled]}>
           <IconButton label="Subir ejercicio" icon={ArrowUp} onPress={onMoveUp} />
@@ -105,14 +113,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  numberBadge: {
+    alignItems: "center",
+    backgroundColor: withOpacity(colors.lime, 0.12),
+    borderRadius: 14,
+    height: 28,
+    justifyContent: "center",
+    width: 28,
+  },
+  numberText: {
+    color: colors.lime,
+    fontSize: 13,
+    fontWeight: "900",
+  },
   copy: {
     flex: 1,
-    gap: 3,
+    gap: 4,
   },
-  kicker: {
-    color: colors.lime,
-    fontSize: 11,
-    fontWeight: "900",
+  chipRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
   },
   title: {
     color: colors.text,
@@ -120,9 +142,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "capitalize",
   },
-  meta: {
+  equipmentText: {
     color: colors.muted,
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "capitalize",
   },
   iconRow: {
     flexDirection: "row",

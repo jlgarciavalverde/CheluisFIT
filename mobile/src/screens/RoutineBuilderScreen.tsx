@@ -1,12 +1,13 @@
-import { Plus, Save, X } from "lucide-react-native";
+import { Flame, Plus, Repeat, Save, Shield, X, Zap } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { showError } from "../utils/errors";
 import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from "@react-navigation/native-stack";
+import type { LucideIcon } from "lucide-react-native";
 import type { Exercise, ExerciseSetType, WorkoutSet, WorkoutTemplate } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { useToast } from "../contexts/ToastContext";
@@ -16,13 +17,14 @@ import {
   RoutineBuilderSet,
   RoutineExerciseBlock,
 } from "../components/RoutineExerciseBlock";
+import { RoutineStatsHeader } from "../components/RoutineStatsHeader";
 import { Screen } from "../components/Screen";
 import { Section } from "../components/Section";
 import { SetEditorSheet } from "../components/SetEditorSheet";
 import { TextField } from "../components/TextField";
 import { WorkoutExercisePicker } from "../components/WorkoutExercisePicker";
 import type { RoutinesStackParamList } from "../navigation/types";
-import { colors } from "../theme/tokens";
+import { colors, radius } from "../theme/tokens";
 
 type RouteProps = NativeStackScreenProps<RoutinesStackParamList, "RoutineBuilder">["route"];
 type EditingSet = { exerciseClientId: string; set: RoutineBuilderSet };
@@ -102,10 +104,12 @@ export function RoutineBuilderScreen() {
       <Section title={template ? "Editar rutina" : "Crear rutina"}>
         <TextField value={name} onChangeText={setName} />
         <TextField value={notes} onChangeText={setNotes} placeholder="Notas" />
-        <Text style={styles.meta}>
-          {totals.exercises} ejercicios · {totals.sets} series objetivo · {totals.effectiveSets}{" "}
-          efectivas · {totals.estimatedMinutes} min
-        </Text>
+        <RoutineStatsHeader
+          exercises={totals.exercises}
+          sets={totals.sets}
+          effectiveSets={totals.effectiveSets}
+          minutes={totals.estimatedMinutes}
+        />
         <View style={styles.actions}>
           <Button icon={Plus} label="Anadir ejercicio" onPress={() => setPickerOpen(true)} />
           <Button icon={X} label="Cancelar" variant="ghost" onPress={() => navigation.goBack()} />
@@ -113,17 +117,37 @@ export function RoutineBuilderScreen() {
       </Section>
 
       <Section title="Presets rapidos">
-        <View style={styles.actions}>
-          <Button label="3x10" variant="secondary" onPress={() => applyPreset(3, 10)} />
-          <Button label="4x8" variant="secondary" onPress={() => applyPreset(4, 8)} />
-          <Button label="5x5" variant="secondary" onPress={() => applyPreset(5, 5)} />
-          <Button label="Calent + 3" variant="secondary" onPress={applyWarmupPreset} />
+        <View style={styles.presetGrid}>
+          <PresetCard
+            icon={Repeat}
+            title="3x10"
+            subtitle="Hipertrofia"
+            onPress={() => applyPreset(3, 10)}
+          />
+          <PresetCard
+            icon={Shield}
+            title="4x8"
+            subtitle="Fuerza"
+            onPress={() => applyPreset(4, 8)}
+          />
+          <PresetCard
+            icon={Zap}
+            title="5x5"
+            subtitle="Potencia"
+            onPress={() => applyPreset(5, 5)}
+          />
+          <PresetCard
+            icon={Flame}
+            title="Calent."
+            subtitle="Progresivo"
+            onPress={applyWarmupPreset}
+          />
         </View>
       </Section>
 
       <Section title="Bloques">
         {exercises.length === 0 ? (
-          <Text style={styles.meta}>Anade ejercicios para construir tu rutina.</Text>
+          <Text style={styles.emptyText}>Anade ejercicios para construir tu rutina.</Text>
         ) : (
           exercises.map((exercise, index) => (
             <RoutineExerciseBlock
@@ -149,7 +173,12 @@ export function RoutineBuilderScreen() {
         icon={Save}
         label={saving ? "Guardando..." : "Guardar rutina"}
         disabled={saving}
-        onPress={() => save().catch((error) => { setSaving(false); showError(error); })}
+        onPress={() =>
+          save().catch((error) => {
+            setSaving(false);
+            showError(error);
+          })
+        }
       />
 
       <WorkoutExercisePicker
@@ -371,12 +400,58 @@ function createClientId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function PresetCard({
+  icon: Icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.presetCard} onPress={onPress}>
+      <Icon size={14} color={colors.lime} />
+      <Text style={styles.presetTitle}>{title}</Text>
+      <Text style={styles.presetSubtitle}>{subtitle}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     gap: 8,
   },
-  meta: {
+  presetGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  presetCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: "48%",
+  },
+  presetTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  presetSubtitle: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  emptyText: {
     color: colors.muted,
     fontSize: 13,
   },

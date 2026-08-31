@@ -11,6 +11,7 @@ type Props = {
 export function Screen({ children, refreshing, onRefresh }: Props) {
   return (
     <ScrollView
+      style={styles.screen}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
       onScrollBeginDrag={Keyboard.dismiss}
@@ -31,6 +32,9 @@ export function Screen({ children, refreshing, onRefresh }: Props) {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.background,
+  },
   content: {
     backgroundColor: colors.background,
     gap: 18,

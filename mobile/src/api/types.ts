@@ -69,6 +69,23 @@ export type ProgressPoint = {
   totalReps: number;
 };
 
+export type ExerciseRecordSummary = {
+  userId: string;
+  exerciseId: string;
+  bestWeight: {
+    weightKg: number;
+    reps: number;
+    performedAt: string;
+    sessionId: string;
+  } | null;
+  bestVolume: {
+    volumeKg: number;
+    performedAt: string;
+    sessionId: string;
+  } | null;
+  lastEntry: ProgressPoint | null;
+};
+
 export type ExerciseSetType = "NORMAL" | "WARMUP" | "SUPERSET" | "DROPSET";
 
 export type WorkoutSessionStatus = "IN_PROGRESS" | "COMPLETED";
@@ -140,9 +157,11 @@ export type ProgressionSuggestion = {
 
 export type DashboardData = {
   workoutsThisWeek: number;
+  weeklyMuscleSummary: MuscleSummaryPoint[];
   recentWorkouts: Array<{
     id: string;
     performedAt: string;
+    durationMinutes: number | null;
     exerciseCount: number;
     totalSets: number;
     totalVolumeKg: number;
@@ -150,14 +169,21 @@ export type DashboardData = {
   mostWorkedExercises: Array<{
     exerciseId: string;
     name: string;
+    sessionCount: number;
     totalSets: number;
     totalVolumeKg: number;
+    lastPerformedAt: string;
   }>;
   bodyWeightTrend: Array<{
     measuredAt: string;
     weightKg: number;
     heightCm: number;
   }>;
+};
+
+export type ExercisePicks = {
+  favorites: Exercise[];
+  recent: Exercise[];
 };
 
 export type BodyMeasurement = {

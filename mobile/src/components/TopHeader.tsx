@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, typography } from "../theme/tokens";
+import { colors, typography, withOpacity } from "../theme/tokens";
 import { Button } from "./Button";
 
 export function TopHeader({
@@ -27,12 +27,14 @@ export function TopHeader({
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundElevated,
+    borderBottomColor: withOpacity(colors.borderStrong, 0.45),
+    borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingBottom: 12,
+    paddingBottom: 14,
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   copy: {
     flex: 1,
@@ -49,5 +51,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.title,
     fontWeight: "900",
+    letterSpacing: 0,
   },
 });

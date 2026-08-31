@@ -7,7 +7,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { showError } from "../utils/errors";
 import { EmptyState } from "../components/EmptyState";
 import { ExerciseFilterBar } from "../components/ExerciseFilterBar";
-import { ExerciseRow } from "../components/ExerciseRow";
+import { ExerciseCard } from "../components/ExerciseCard";
 import { LoadingState } from "../components/LoadingState";
 import type { ExercisesStackParamList } from "../navigation/types";
 import { colors } from "../theme/tokens";
@@ -96,14 +96,13 @@ export function ExercisesScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: Exercise }) => (
-      <ExerciseRow
+      <ExerciseCard
         exercise={item}
-        badges={buildBadges(item.id, exerciseStates, favorites)}
-        selected={false}
+        state={exerciseStates.get(item.id)}
         onPress={() => navigation.navigate("ExerciseDetail", { exercise: item })}
       />
     ),
-    [exerciseStates, favorites, navigation],
+    [exerciseStates, navigation],
   );
 
   const keyExtractor = useCallback((item: Exercise) => item.id, []);
@@ -177,18 +176,6 @@ function Separator() {
   return <View style={styles.separator} />;
 }
 
-function buildBadges(
-  exerciseId: string,
-  exerciseStates: Map<string, ExerciseState>,
-  favorites: Set<string>,
-) {
-  const state = exerciseStates.get(exerciseId);
-  return [
-    favorites.has(exerciseId) ? "Favorito" : null,
-    state?.usedRecently ? "Reciente" : null,
-    state?.inRoutine ? "En rutina" : null,
-  ].filter((badge): badge is string => Boolean(badge));
-}
 
 const styles = StyleSheet.create({
   content: {

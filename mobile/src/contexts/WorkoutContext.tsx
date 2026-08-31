@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import * as Haptics from "expo-haptics";
 import type { WorkoutSession } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -31,6 +40,7 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
   const [restTotal, setRestTotal] = useState(0);
   const [restLeft, setRestLeft] = useState(0);
+  const previousRestLeft = useRef(0);
 
   const loadActiveSession = useCallback(async () => {
     if (!user) return;
@@ -48,6 +58,14 @@ export function WorkoutProvider({ children }: { children: ReactNode }) {
       setRestLeft((current) => Math.max(current - 1, 0));
     }, 1000);
     return () => clearInterval(timer);
+  }, [restLeft]);
+
+  useEffect(() => {
+    if (previousRestLeft.current > 0 && restLeft === 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    }
+
+    previousRestLeft.current = restLeft;
   }, [restLeft]);
 
   const startRest = (seconds: number) => {

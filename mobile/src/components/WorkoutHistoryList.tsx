@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Clock } from "lucide-react-native";
 import type { WorkoutSession } from "../api/types";
 import { colors, radius, shadow, withOpacity } from "../theme/tokens";
 import { EmptyState } from "./EmptyState";
+import { MuscleChip } from "./MuscleChip";
 import { StatStrip } from "./StatStrip";
 
 export function WorkoutHistoryList({
@@ -34,30 +36,40 @@ export function WorkoutHistoryList({
                 exercise.sets.reduce((setTotal, set) => setTotal + set.weightKg * set.reps, 0),
               0,
             );
-            const topMuscles = session.muscleSummary
-              .slice(0, 2)
-              .map((point) => `${point.muscle} ${point.effectiveSets}`)
-              .join(" · ");
+            const topMuscles = session.muscleSummary.slice(0, 3);
             const isCompleted = session.status === "COMPLETED";
+            const duration = formatSessionDuration(session);
 
             return (
               <Pressable
                 key={session.id}
                 accessibilityRole="button"
                 onPress={() => onSelect?.(session)}
-                style={[styles.card, isCompleted ? styles.cardDone : styles.cardActive]}
+                style={({ pressed }) => [
+                  styles.card,
+                  isCompleted ? styles.cardDone : styles.cardActive,
+                  pressed && styles.pressed,
+                ]}
               >
                 <View style={styles.header}>
                   <Text style={styles.title}>{formatDate(session.performedAt)}</Text>
-                  <View style={[styles.badge, isCompleted ? styles.badgeDone : styles.badgeActive]}>
-                    <Text
-                      style={[
-                        styles.badgeText,
-                        isCompleted ? styles.badgeTextDone : styles.badgeTextActive,
-                      ]}
+                  <View style={styles.headerRight}>
+                    <View style={styles.durationRow}>
+                      <Clock size={12} color={colors.muted} />
+                      <Text style={styles.durationText}>{duration}</Text>
+                    </View>
+                    <View
+                      style={[styles.badge, isCompleted ? styles.badgeDone : styles.badgeActive]}
                     >
-                      {isCompleted ? "Completado" : "Activo"}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          isCompleted ? styles.badgeTextDone : styles.badgeTextActive,
+                        ]}
+                      >
+                        {isCompleted ? "Completado" : "Activo"}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -72,14 +84,24 @@ export function WorkoutHistoryList({
                   items={[
                     { label: "Volumen", value: `${Math.round(volumeKg)} kg` },
                     { label: "Series", value: setCount },
-                    { label: "Duracion", value: formatSessionDuration(session) },
+                    { label: "Ejercicios", value: session.exercises.length },
                   ]}
                 />
 
-                {topMuscles ? (
+                {topMuscles.length > 0 ? (
                   <View style={styles.focus}>
-                    <Text style={styles.focusLabel}>Foco</Text>
-                    <Text style={styles.focusText}>{topMuscles}</Text>
+                    <Text style={styles.focusLabel}>Foco muscular</Text>
+                    <View style={styles.chipRow}>
+                      {topMuscles.map((point) => (
+                        <MuscleChip
+                          key={point.muscle}
+                          label={`${point.muscle} ${point.effectiveSets}s`}
+                          type={
+                            point.effectiveSets >= point.recommendedMin ? "primary" : "secondary"
+                          }
+                        />
+                      ))}
+                    </View>
                   </View>
                 ) : null}
               </Pressable>
@@ -148,16 +170,34 @@ const styles = StyleSheet.create({
   cardActive: {
     borderColor: colors.cyan,
   },
+  pressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.99 }],
+  },
   header: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
     justifyContent: "space-between",
   },
+  headerRight: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
   title: {
     color: colors.text,
     fontSize: 15,
     fontWeight: "900",
+  },
+  durationRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+  },
+  durationText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
   },
   badge: {
     alignSelf: "flex-start",
@@ -167,11 +207,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   badgeDone: {
-    backgroundColor: withOpacity(colors.lime, 0.10),
+    backgroundColor: withOpacity(colors.lime, 0.1),
     borderColor: colors.lime,
   },
   badgeActive: {
-    backgroundColor: withOpacity(colors.cyan, 0.10),
+    backgroundColor: withOpacity(colors.cyan, 0.1),
     borderColor: colors.cyan,
   },
   badgeText: {
@@ -196,7 +236,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     borderWidth: 1,
-    gap: 2,
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
@@ -207,9 +247,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: "uppercase",
   },
-  focusText: {
-    color: colors.textSoft,
-    fontSize: 12,
-    fontWeight: "700",
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
   },
 });
