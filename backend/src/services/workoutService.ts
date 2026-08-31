@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/httpError";
 import { computeProgressMetrics } from "../utils/progressMetrics";
 import { clamp, ensureExercisesExist } from "../utils/queryHelpers";
+import { computeMuscleSummaryFromWorkoutExercises } from "./muscleSummaryService";
 
 type CreateWorkoutSessionInput = {
   performedAt?: Date;
@@ -163,9 +164,7 @@ export async function updateWorkoutSession(
   if (input.status !== undefined) {
     data.status = input.status;
     data.completedAt =
-      input.status === WorkoutSessionStatus.COMPLETED
-        ? input.completedAt ?? new Date()
-        : null;
+      input.status === WorkoutSessionStatus.COMPLETED ? (input.completedAt ?? new Date()) : null;
   } else if (input.completedAt !== undefined) {
     data.completedAt = input.completedAt;
   }
@@ -217,11 +216,7 @@ export async function removeWorkoutExercise(
   return getWorkoutSession(userId, sessionId);
 }
 
-export async function removeWorkoutSet(
-  userId: string,
-  sessionId: string,
-  setId: string,
-) {
+export async function removeWorkoutSet(userId: string, sessionId: string, setId: string) {
   await ensureActiveWorkoutSessionOwnership(userId, sessionId);
 
   const set = await prisma.exerciseSet.findFirst({
@@ -568,7 +563,7 @@ function normalizeWorkoutSession(session: WorkoutSessionWithRelations) {
       },
       sets: workoutExercise.sets.map(normalizeExerciseSet),
     })),
-    muscleSummary: computeMuscleSummary(session),
+    muscleSummary: computeMuscleSummaryFromWorkoutExercises(session.exercises),
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
   };
@@ -592,45 +587,6 @@ function normalizeExerciseSet(set: {
     restSeconds: set.restSeconds,
     completedAt: set.completedAt?.toISOString() ?? null,
   };
-}
-
-function computeMuscleSummary(session: WorkoutSessionWithRelations) {
-  const summary = new Map<string, { muscle: string; effectiveSets: number; recommendedMin: number; recommendedMax: number }>();
-
-  for (const workoutExercise of session.exercises) {
-    const effectiveSetCount = workoutExercise.sets.filter(
-      (set) => set.type !== ExerciseSetType.WARMUP,
-    ).length;
-
-    for (const muscle of workoutExercise.exercise.targetMuscles) {
-      addMuscleSets(summary, muscle, effectiveSetCount);
-    }
-
-    for (const muscle of workoutExercise.exercise.secondaryMuscles) {
-      addMuscleSets(summary, muscle, effectiveSetCount * 0.5);
-    }
-  }
-
-  return Array.from(summary.values()).sort((a, b) => b.effectiveSets - a.effectiveSets);
-}
-
-function addMuscleSets(
-  summary: Map<string, { muscle: string; effectiveSets: number; recommendedMin: number; recommendedMax: number }>,
-  muscle: string,
-  value: number,
-) {
-  const key = muscle.toLowerCase();
-  const current =
-    summary.get(key) ??
-    {
-      muscle,
-      effectiveSets: 0,
-      recommendedMin: 4,
-      recommendedMax: 6,
-    };
-
-  current.effectiveSets += value;
-  summary.set(key, current);
 }
 
 async function ensureNoActiveWorkoutSession(userId: string) {
@@ -674,4 +630,3 @@ function getProgressionIncrementKg(bodyParts: string[]) {
   const lowerBodyParts = new Set(["upper legs", "lower legs", "legs"]);
   return bodyParts.some((bodyPart) => lowerBodyParts.has(bodyPart.toLowerCase())) ? 5 : 2.5;
 }
-

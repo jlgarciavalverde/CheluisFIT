@@ -10,7 +10,7 @@ dashboardRoutes.use(requireAuth);
 dashboardRoutes.get("/", async (req, res, next) => {
   try {
     const dashboard = await getDashboard(getAuthUser(req).id);
-    res.json({ data: dashboard });
+    res.json(dashboard);
   } catch (error) {
     next(error);
   }

@@ -1,36 +1,55 @@
 import { prisma } from "../lib/prisma";
+import { computeDurationMinutes, computeMuscleSummaryFromSessions } from "./muscleSummaryService";
 
 export async function getDashboard(userId: string) {
   const weekStart = getWeekStart(new Date());
 
-  const [workoutsThisWeek, recentSessions, bodyMeasurements] = await prisma.$transaction([
-    prisma.workoutSession.count({
-      where: {
-        userId,
-        performedAt: {
-          gte: weekStart,
-        },
-      },
-    }),
-    prisma.workoutSession.findMany({
-      where: { userId },
-      include: {
-        exercises: {
-          include: {
-            exercise: true,
-            sets: true,
+  const [workoutsThisWeek, weeklySessions, recentSessions, bodyMeasurements] =
+    await prisma.$transaction([
+      prisma.workoutSession.count({
+        where: {
+          userId,
+          performedAt: {
+            gte: weekStart,
           },
         },
-      },
-      orderBy: { performedAt: "desc" },
-      take: 10,
-    }),
-    prisma.bodyMeasurement.findMany({
-      where: { userId },
-      orderBy: { measuredAt: "asc" },
-      take: 20,
-    }),
-  ]);
+      }),
+      prisma.workoutSession.findMany({
+        where: {
+          userId,
+          performedAt: {
+            gte: weekStart,
+          },
+        },
+        include: {
+          exercises: {
+            include: {
+              exercise: true,
+              sets: true,
+            },
+          },
+        },
+        orderBy: { performedAt: "desc" },
+      }),
+      prisma.workoutSession.findMany({
+        where: { userId },
+        include: {
+          exercises: {
+            include: {
+              exercise: true,
+              sets: true,
+            },
+          },
+        },
+        orderBy: { performedAt: "desc" },
+        take: 10,
+      }),
+      prisma.bodyMeasurement.findMany({
+        where: { userId },
+        orderBy: { measuredAt: "asc" },
+        take: 20,
+      }),
+    ]);
 
   const exerciseStats = new Map<
     string,
@@ -47,16 +66,14 @@ export async function getDashboard(userId: string) {
   for (const session of recentSessions) {
     for (const workoutExercise of session.exercises) {
       const existing = exerciseStats.get(workoutExercise.exerciseId);
-      const stat =
-        existing ??
-        {
-          exerciseId: workoutExercise.exerciseId,
-          name: workoutExercise.exercise.name,
-          sessions: new Set<string>(),
-          totalSets: 0,
-          totalVolumeKg: 0,
-          lastPerformedAt: session.performedAt,
-        };
+      const stat = existing ?? {
+        exerciseId: workoutExercise.exerciseId,
+        name: workoutExercise.exercise.name,
+        sessions: new Set<string>(),
+        totalSets: 0,
+        totalVolumeKg: 0,
+        lastPerformedAt: session.performedAt,
+      };
 
       stat.sessions.add(session.id);
       stat.totalSets += workoutExercise.sets.length;
@@ -73,9 +90,11 @@ export async function getDashboard(userId: string) {
   return {
     data: {
       workoutsThisWeek,
+      weeklyMuscleSummary: computeMuscleSummaryFromSessions(weeklySessions),
       recentWorkouts: recentSessions.map((session) => ({
         id: session.id,
         performedAt: session.performedAt.toISOString(),
+        durationMinutes: computeDurationMinutes(session.startedAt, session.completedAt),
         exerciseCount: session.exercises.length,
         totalSets: session.exercises.reduce(
           (total, workoutExercise) => total + workoutExercise.sets.length,

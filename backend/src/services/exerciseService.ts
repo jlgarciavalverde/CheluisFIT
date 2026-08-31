@@ -200,8 +200,7 @@ export async function getExerciseFacets() {
 
 export async function getExerciseStates(userId: string, exerciseIds?: string[]) {
   const requestedIds = new Set(exerciseIds?.filter(Boolean) ?? []);
-  const exerciseFilter =
-    requestedIds.size > 0 ? { exerciseId: { in: [...requestedIds] } } : {};
+  const exerciseFilter = requestedIds.size > 0 ? { exerciseId: { in: [...requestedIds] } } : {};
 
   const [favorites, workoutExercises, templateExercises] = await prisma.$transaction([
     prisma.favoriteExercise.findMany({
@@ -283,6 +282,46 @@ export async function getExerciseStates(userId: string, exerciseIds?: string[]) 
   };
 }
 
+export async function getExercisePicks(userId: string) {
+  const [favorites, recentWorkoutExercises] = await prisma.$transaction([
+    prisma.favoriteExercise.findMany({
+      where: { userId },
+      include: { exercise: true },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
+    prisma.workoutExercise.findMany({
+      where: {
+        workoutSession: { userId },
+      },
+      include: {
+        exercise: true,
+        workoutSession: {
+          select: {
+            performedAt: true,
+          },
+        },
+      },
+      orderBy: { workoutSession: { performedAt: "desc" } },
+      take: 40,
+    }),
+  ]);
+
+  const recent = new Map<string, (typeof recentWorkoutExercises)[number]["exercise"]>();
+
+  for (const workoutExercise of recentWorkoutExercises) {
+    if (recent.size >= 12) break;
+    recent.set(workoutExercise.exerciseId, workoutExercise.exercise);
+  }
+
+  return {
+    data: {
+      favorites: favorites.map((favorite) => normalizeLocalExercise(favorite.exercise)),
+      recent: [...recent.values()].map(normalizeLocalExercise),
+    },
+  };
+}
+
 export async function getLocalExerciseById(id: string) {
   const exercise = await prisma.exercise.findUnique({ where: { id } });
   return exercise ? normalizeLocalExercise(exercise) : null;
@@ -300,7 +339,10 @@ export async function searchExternalExercises(q: string, limit = 20, offset = 0)
   }
 
   const rawExercises: ExternalExerciseItem[] = [];
-  const pagesToRead = Math.max(1, Math.ceil((normalizedOffset + normalizedLimit) / EXTERNAL_PAGE_SIZE));
+  const pagesToRead = Math.max(
+    1,
+    Math.ceil((normalizedOffset + normalizedLimit) / EXTERNAL_PAGE_SIZE),
+  );
   let after: string | undefined;
   let total = 0;
 

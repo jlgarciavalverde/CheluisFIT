@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MeasurementUnits, TrainingGoal } from "@prisma/client";
+import { ExerciseSetType, MeasurementUnits, TrainingGoal } from "@prisma/client";
 import {
   authed,
   cleanupTestData,
+  exerciseId,
   namespace,
   registerUser,
   seedExercises,
@@ -63,14 +64,12 @@ describe("Profile & Preferences", () => {
       units: MeasurementUnits.METRIC,
     });
 
-    const updated = await authed(auth)
-      .patch("/api/me/preferences")
-      .send({
-        defaultRestSeconds: 120,
-        weeklyFrequency: 5,
-        goal: TrainingGoal.STRENGTH,
-        units: MeasurementUnits.METRIC,
-      });
+    const updated = await authed(auth).patch("/api/me/preferences").send({
+      defaultRestSeconds: 120,
+      weeklyFrequency: 5,
+      goal: TrainingGoal.STRENGTH,
+      units: MeasurementUnits.METRIC,
+    });
 
     expect(updated.status).toBe(200);
     expect(updated.body.data).toMatchObject({
@@ -79,10 +78,38 @@ describe("Profile & Preferences", () => {
       goal: TrainingGoal.STRENGTH,
     });
 
-    const invalid = await authed(auth)
-      .patch("/api/me/preferences")
-      .send({ weeklyFrequency: 0 });
+    const invalid = await authed(auth).patch("/api/me/preferences").send({ weeklyFrequency: 0 });
 
     expect(invalid.status).toBe(400);
+  });
+
+  it("returns all-time muscle stats and exercise picks", async () => {
+    await authed(auth)
+      .post("/api/workout-sessions")
+      .send({
+        performedAt: "2026-01-05T10:00:00.000Z",
+        exercises: [
+          {
+            exerciseId,
+            sets: [
+              { weightKg: 20, reps: 10, type: ExerciseSetType.WARMUP },
+              { weightKg: 60, reps: 8, type: ExerciseSetType.NORMAL },
+              { weightKg: 60, reps: 8, type: ExerciseSetType.NORMAL },
+            ],
+          },
+        ],
+      });
+
+    const muscleStats = await authed(auth).get("/api/me/muscle-stats");
+    expect(muscleStats.status).toBe(200);
+    expect(muscleStats.body.data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ muscle: "pectorals", effectiveSets: 2 })]),
+    );
+
+    const picks = await authed(auth).get("/api/me/exercise-picks");
+    expect(picks.status).toBe(200);
+    expect(picks.body.data.recent).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: exerciseId })]),
+    );
   });
 });

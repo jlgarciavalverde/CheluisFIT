@@ -17,13 +17,9 @@ describe("Dashboard", () => {
     await seedExercises();
     auth = await registerUser(`dashboard.${namespace}@cheluisfit.test`);
 
-    await authed(auth)
-      .post("/api/me/body-measurements")
-      .send({ weightKg: 80, heightCm: 180 });
+    await authed(auth).post("/api/me/body-measurements").send({ weightKg: 80, heightCm: 180 });
 
-    await authed(auth)
-      .post("/api/me/body-measurements")
-      .send({ weightKg: 79.5, heightCm: 180 });
+    await authed(auth).post("/api/me/body-measurements").send({ weightKg: 79.5, heightCm: 180 });
 
     await authed(auth)
       .post("/api/workout-sessions")
@@ -45,22 +41,27 @@ describe("Dashboard", () => {
 
   it("returns dashboard with workouts this week and body weight trend", async () => {
     const result = await authed(auth).get("/api/me/dashboard");
-    const dashboard = result.body.data.data;
+    const dashboard = result.body.data;
 
     expect(result.status).toBe(200);
     expect(dashboard).toHaveProperty("workoutsThisWeek");
     expect(dashboard.workoutsThisWeek).toBeGreaterThanOrEqual(1);
     expect(dashboard).toHaveProperty("bodyWeightTrend");
     expect(dashboard.bodyWeightTrend.length).toBeGreaterThanOrEqual(2);
+    expect(dashboard.weeklyMuscleSummary).toEqual(
+      expect.arrayContaining([expect.objectContaining({ muscle: "pectorals", effectiveSets: 2 })]),
+    );
+    expect(dashboard.recentWorkouts[0]).toHaveProperty("durationMinutes");
   });
 
   it("returns dashboard even for a fresh user with no data", async () => {
     const freshAuth = await registerUser(`dashboard-fresh.${namespace}@cheluisfit.test`);
     const result = await authed(freshAuth).get("/api/me/dashboard");
-    const dashboard = result.body.data.data;
+    const dashboard = result.body.data;
 
     expect(result.status).toBe(200);
     expect(dashboard.workoutsThisWeek).toBe(0);
+    expect(dashboard.weeklyMuscleSummary).toEqual([]);
     expect(dashboard.bodyWeightTrend).toEqual([]);
   });
 });

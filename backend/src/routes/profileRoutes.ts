@@ -2,7 +2,8 @@ import { Router } from "express";
 import { MeasurementUnits, TrainingGoal } from "@prisma/client";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/authMiddleware";
-import { getExerciseStates } from "../services/exerciseService";
+import { getExercisePicks, getExerciseStates } from "../services/exerciseService";
+import { getAllTimeMuscleStats } from "../services/muscleStatsService";
 import {
   addBodyMeasurement,
   deleteAccount,
@@ -57,10 +58,7 @@ profileRoutes.get("/", async (req, res, next) => {
 
 profileRoutes.patch("/", async (req, res, next) => {
   try {
-    const profile = await updateProfile(
-      getAuthUser(req).id,
-      updateProfileSchema.parse(req.body),
-    );
+    const profile = await updateProfile(getAuthUser(req).id, updateProfileSchema.parse(req.body));
 
     res.json({ data: profile });
   } catch (error) {
@@ -138,6 +136,24 @@ profileRoutes.get("/exercise-states", async (req, res, next) => {
   }
 });
 
+profileRoutes.get("/exercise-picks", async (req, res, next) => {
+  try {
+    const picks = await getExercisePicks(getAuthUser(req).id);
+    res.json(picks);
+  } catch (error) {
+    next(error);
+  }
+});
+
+profileRoutes.get("/muscle-stats", async (req, res, next) => {
+  try {
+    const stats = await getAllTimeMuscleStats(getAuthUser(req).id);
+    res.json(stats);
+  } catch (error) {
+    next(error);
+  }
+});
+
 profileRoutes.get("/workout-sessions", async (req, res, next) => {
   try {
     const sessions = await listWorkoutSessions({
@@ -151,4 +167,3 @@ profileRoutes.get("/workout-sessions", async (req, res, next) => {
     next(error);
   }
 });
-
